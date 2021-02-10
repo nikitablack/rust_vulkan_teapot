@@ -1,0 +1,17 @@
+[package]
+authors = ["nc <mynameisnikitablack@gmail.com>"]
+edition = "2018"
+name = "title_screen"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ash = "0.31.0"
+common = {path = "../common"}
+imgui = "0.6.0"
+log = "0.4"
+static_assertions = "1.1.0"
+vk-mem = "0.2.2"
+vulkan_base = {path = "../vulkan_base"}
+winit = "0.24.0"
