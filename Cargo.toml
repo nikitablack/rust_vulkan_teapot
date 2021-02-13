@@ -1,8 +1,5 @@
 [workspace]
 
 members = [
-  "common",
-  "game",
-  "title_screen",
-  "vulkan_base",
+  "teapot",
 ]
