@@ -1,3 +1,9 @@
+mod vulkan;
+
+use ash::version::DeviceV1_0;
+use vulkan::VulkanData;
+use vulkan_base::VulkanBase;
+
 fn main() {
     // logger
     let mut loggers: Vec<Box<dyn simplelog::SharedLogger>> = vec![simplelog::TermLogger::new(
@@ -7,7 +13,7 @@ fn main() {
     )];
     if let Ok(file) = std::fs::File::create("log.txt") {
         loggers.push(simplelog::WriteLogger::new(
-            simplelog::LevelFilter::Trace,
+            simplelog::LevelFilter::Info,
             simplelog::Config::default(),
             file,
         ));
@@ -22,6 +28,34 @@ fn main() {
         .with_inner_size(winit::dpi::LogicalSize::new(800.0, 600.0))
         .build(&event_loop)
         .unwrap();
+
+    // vulkan base
+    let enable_debug_utils = true;
+    let device_extensions = vec![];
+    let instance_extensions =
+        vulkan::get_required_instance_extensions(&window, enable_debug_utils).unwrap();
+
+    let vk_base = match VulkanBase::new(
+        &window,
+        &instance_extensions,
+        &device_extensions,
+        enable_debug_utils,
+    ) {
+        Ok(vk_base) => vk_base,
+        Err(msg) => {
+            log::error!("{}", msg);
+            panic!(msg);
+        }
+    };
+
+    // vulkan data
+    let vk_data = match VulkanData::new(&vk_base) {
+        Ok(vk_data) => vk_data,
+        Err(msg) => {
+            log::error!("{}", msg);
+            panic!(msg);
+        }
+    };
 
     // loop
     let mut app_exit = false;
@@ -41,7 +75,12 @@ fn main() {
             } => {
                 *control_flow = ControlFlow::Exit;
 
-                // TODO cleanup
+                unsafe {
+                    let _ = vk_base.device.device_wait_idle();
+                }
+
+                vk_data.clean(&vk_base);
+                vk_base.clean();
 
                 app_exit = true;
 
