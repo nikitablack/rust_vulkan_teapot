@@ -1,3 +1,4 @@
+mod teapot_data;
 mod vulkan;
 
 use ash::version::DeviceV1_0;
@@ -35,7 +36,7 @@ fn main() {
     let instance_extensions =
         vulkan::get_required_instance_extensions(&window, enable_debug_utils).unwrap();
 
-    let vk_base = match VulkanBase::new(
+    let mut vk_base = match VulkanBase::new(
         &window,
         &instance_extensions,
         &device_extensions,

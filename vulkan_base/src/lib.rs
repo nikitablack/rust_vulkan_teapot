@@ -1,5 +1,6 @@
 mod check_instance_version;
 mod check_required_instance_extensions;
+mod create_allocator;
 mod create_instance;
 mod create_logical_device;
 mod get_depth_format;
@@ -15,6 +16,7 @@ use ash::vk;
 
 use check_instance_version::*;
 use check_required_instance_extensions::*;
+use create_allocator::*;
 use create_instance::*;
 use create_logical_device::*;
 use get_depth_format::*;
@@ -37,6 +39,7 @@ pub struct VulkanBase {
     pub queue_family: u32,
     pub device: ash::Device,
     pub queue: vk::Queue,
+    pub allocator: vk_mem::Allocator,
 }
 
 impl VulkanBase {
@@ -106,6 +109,7 @@ impl VulkanBase {
         )?;
 
         let queue = unsafe { device.get_device_queue(queue_family, 0) };
+        let allocator = create_allocator(&instance, &device, physical_device)?;
 
         let vulkan_base = Self {
             entry,
@@ -121,16 +125,20 @@ impl VulkanBase {
             depth_format,
             device,
             queue,
+            allocator,
         };
 
         Ok(vulkan_base)
     }
 
-    pub fn clean(&self) {
+    pub fn clean(&mut self) {
         log::info!("cleaning vulkan base");
 
         unsafe {
+            self.allocator.destroy();
+            self.surface_loader.destroy_surface(self.surface, None);
             self.device.destroy_device(None);
+            self.instance.destroy_instance(None);
         }
     }
 }
