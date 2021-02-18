@@ -42,6 +42,24 @@ pub struct VulkanBase {
     pub allocator: vk_mem::Allocator,
 }
 
+#[derive(Default)]
+struct InternalState {
+    entry: Option<ash::Entry>,
+    instance: Option<ash::Instance>,
+    surface_loader: Option<khr::Surface>,
+    debug_utils_loader: Option<ash::extensions::ext::DebugUtils>,
+    surface: vk::SurfaceKHR,
+    physical_device: vk::PhysicalDevice,
+    physical_device_properties: vk::PhysicalDeviceProperties,
+    surface_format: vk::SurfaceFormatKHR,
+    present_mode: vk::PresentModeKHR,
+    depth_format: vk::Format,
+    queue_family: u32,
+    device: Option<ash::Device>,
+    queue: vk::Queue,
+    allocator: Option<vk_mem::Allocator>,
+}
+
 impl VulkanBase {
     pub fn new<'a, 'b>(
         window: &winit::window::Window,
@@ -49,83 +67,35 @@ impl VulkanBase {
         required_device_extensions: &Vec<&'b std::ffi::CStr>,
         enable_debug_utils: bool,
     ) -> Result<Self, String> {
-        let entry = match ash::Entry::new() {
-            Ok(entry) => entry,
-            Err(_) => return Err(String::from("failed to create Entry")),
-        };
+        let mut internal_state = InternalState::default();
 
-        check_instance_version(&entry)?;
-        check_required_instance_extensions(&entry, required_instance_extensions)?;
+        if let Err(msg) = new_internal(
+            &mut internal_state,
+            window,
+            required_instance_extensions,
+            required_device_extensions,
+            enable_debug_utils,
+        ) {
+            clean_internal(&mut internal_state);
 
-        let instance = create_instance(&entry, required_instance_extensions)?;
-
-        let debug_utils_loader = match enable_debug_utils {
-            true => {
-                log::info!("debug utils loader created");
-                Some(ash::extensions::ext::DebugUtils::new(&entry, &instance))
-            }
-            false => None,
-        };
-
-        let surface_loader = ash::extensions::khr::Surface::new(&entry, &instance);
-
-        let surface = unsafe {
-            ash_window::create_surface(&entry, &instance, window, None)
-                .map_err(|_| String::from("failed to create surface"))?
-        };
-
-        let physical_device = get_physical_device(&instance, &required_device_extensions)?;
-        let physical_device_properties =
-            unsafe { instance.get_physical_device_properties(physical_device) };
-        let surface_format = get_surface_format(physical_device, &surface_loader, surface)?;
-        let present_mode = get_present_mode(physical_device, &surface_loader, surface)?;
-        let queue_family = get_queue_family(physical_device, &instance, &surface_loader, surface)?;
-        let depth_format = get_depth_format(physical_device, &instance)?;
-
-        let device_name =
-            unsafe { std::ffi::CStr::from_ptr(physical_device_properties.device_name.as_ptr()) };
-
-        log::info!("selected physical device {:?}", device_name);
-        log::info!(
-            "\tsupported api version: {}.{}.{}",
-            vk::version_major(physical_device_properties.api_version),
-            vk::version_minor(physical_device_properties.api_version),
-            vk::version_patch(physical_device_properties.api_version)
-        );
-        log::info!(
-            "\tdriver version: {}",
-            physical_device_properties.driver_version
-        );
-        log::info!("\tsurface format: {:?}", surface_format);
-        log::info!("\tpresent mode: {:?}", present_mode);
-        log::info!("\tdepth format: {:?}", depth_format);
-        log::info!("\tqueue family: {}", queue_family);
-
-        let device = create_logical_device(
-            &instance,
-            physical_device,
-            queue_family,
-            &required_device_extensions,
-        )?;
-
-        let queue = unsafe { device.get_device_queue(queue_family, 0) };
-        let allocator = create_allocator(&instance, &device, physical_device)?;
+            return Err(msg);
+        }
 
         let vulkan_base = Self {
-            entry,
-            instance,
-            debug_utils_loader,
-            surface_loader,
-            surface,
-            physical_device,
-            physical_device_properties,
-            surface_format,
-            present_mode,
-            queue_family,
-            depth_format,
-            device,
-            queue,
-            allocator,
+            entry: internal_state.entry.unwrap(),
+            instance: internal_state.instance.unwrap(),
+            debug_utils_loader: internal_state.debug_utils_loader,
+            surface_loader: internal_state.surface_loader.unwrap(),
+            surface: internal_state.surface,
+            physical_device: internal_state.physical_device,
+            physical_device_properties: internal_state.physical_device_properties,
+            surface_format: internal_state.surface_format,
+            present_mode: internal_state.present_mode,
+            queue_family: internal_state.queue_family,
+            depth_format: internal_state.depth_format,
+            device: internal_state.device.unwrap(),
+            queue: internal_state.queue,
+            allocator: internal_state.allocator.unwrap(),
         };
 
         Ok(vulkan_base)
@@ -134,11 +104,123 @@ impl VulkanBase {
     pub fn clean(&mut self) {
         log::info!("cleaning vulkan base");
 
-        unsafe {
-            self.allocator.destroy();
-            self.surface_loader.destroy_surface(self.surface, None);
-            self.device.destroy_device(None);
-            self.instance.destroy_instance(None);
+        let mut internal_state = InternalState {
+            entry: Some(self.entry.clone()),
+            instance: Some(self.instance.clone()),
+            surface_loader: Some(self.surface_loader.clone()),
+            debug_utils_loader: self.debug_utils_loader.clone(),
+            surface: self.surface,
+            physical_device: self.physical_device,
+            physical_device_properties: self.physical_device_properties,
+            surface_format: self.surface_format,
+            present_mode: self.present_mode,
+            depth_format: self.depth_format,
+            queue_family: self.queue_family,
+            device: Some(self.device.clone()),
+            queue: self.queue,
+            allocator: None, //Some(self.allocator),
+        };
+
+        clean_internal(&mut internal_state);
+    }
+}
+
+fn new_internal<'a, 'b>(
+    state: &mut InternalState,
+    window: &winit::window::Window,
+    required_instance_extensions: &Vec<&'a std::ffi::CStr>,
+    required_device_extensions: &Vec<&'b std::ffi::CStr>,
+    enable_debug_utils: bool,
+) -> Result<(), String> {
+    state.entry = Some(ash::Entry::new().map_err(|_| String::from("failed to create Entry"))?);
+    let entry = state.entry.as_ref().unwrap();
+
+    check_instance_version(entry)?;
+    check_required_instance_extensions(&entry, required_instance_extensions)?;
+
+    state.instance = Some(create_instance(&entry, required_instance_extensions)?);
+    let instance = state.instance.as_ref().unwrap();
+
+    state.debug_utils_loader = match enable_debug_utils {
+        true => {
+            log::info!("debug utils loader created");
+            Some(ash::extensions::ext::DebugUtils::new(entry, instance))
         }
+        false => None,
+    };
+
+    state.surface_loader = Some(ash::extensions::khr::Surface::new(entry, instance));
+    let surface_loader = state.surface_loader.as_ref().unwrap();
+
+    state.surface = unsafe {
+        ash_window::create_surface(entry, instance, window, None)
+            .map_err(|_| String::from("failed to create surface"))?
+    };
+
+    state.physical_device = get_physical_device(&instance, &required_device_extensions)?;
+    state.physical_device_properties =
+        unsafe { instance.get_physical_device_properties(state.physical_device) };
+    state.surface_format =
+        get_surface_format(state.physical_device, surface_loader, state.surface)?;
+    state.present_mode = get_present_mode(state.physical_device, surface_loader, state.surface)?;
+    state.queue_family = get_queue_family(
+        state.physical_device,
+        instance,
+        surface_loader,
+        state.surface,
+    )?;
+    state.depth_format = get_depth_format(state.physical_device, instance)?;
+
+    let device_name =
+        unsafe { std::ffi::CStr::from_ptr(state.physical_device_properties.device_name.as_ptr()) };
+
+    log::info!("selected physical device {:?}", device_name);
+    log::info!(
+        "\tsupported api version: {}.{}.{}",
+        vk::version_major(state.physical_device_properties.api_version),
+        vk::version_minor(state.physical_device_properties.api_version),
+        vk::version_patch(state.physical_device_properties.api_version)
+    );
+    log::info!(
+        "\tdriver version: {}",
+        state.physical_device_properties.driver_version
+    );
+    log::info!("\tsurface format: {:?}", state.surface_format);
+    log::info!("\tpresent mode: {:?}", state.present_mode);
+    log::info!("\tdepth format: {:?}", state.depth_format);
+    log::info!("\tqueue family: {}", state.queue_family);
+
+    state.device = Some(create_logical_device(
+        instance,
+        state.physical_device,
+        state.queue_family,
+        &required_device_extensions,
+    )?);
+    let device = state.device.as_ref().unwrap();
+
+    state.queue = unsafe { device.get_device_queue(state.queue_family, 0) };
+    state.allocator = Some(create_allocator(&instance, device, state.physical_device)?);
+
+    Ok(())
+}
+
+fn clean_internal(state: &mut InternalState) {
+    unsafe {
+        state
+            .allocator
+            .as_mut()
+            .map(|allocator| allocator.destroy());
+        state
+            .device
+            .as_ref()
+            .map(|device| device.destroy_device(None));
+        state
+            .surface_loader
+            .as_ref()
+            .map(|surface_loader| surface_loader.destroy_surface(state.surface, None));
+        state
+            .instance
+            .as_ref()
+            .map(|instance| instance.destroy_instance(None));
     }
 }

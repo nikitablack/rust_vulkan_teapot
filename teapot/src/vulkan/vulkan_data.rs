@@ -18,49 +18,30 @@ pub struct VulkanData {
     pub control_points_mem_buffer: MemBuffer,
 }
 
+#[derive(Default)]
+struct InternalState {
+    vertex_shader_module: vk::ShaderModule,
+    tese_shader_module: vk::ShaderModule,
+    tesc_shader_module: vk::ShaderModule,
+    fragment_shader_module: vk::ShaderModule,
+    control_points_mem_buffer: Option<MemBuffer>,
+}
+
 impl VulkanData {
     pub fn new(vulkan_base: &VulkanBase) -> Result<Self, String> {
-        let vertex_shader_module = create_shader_module(
-            vulkan_base,
-            std::path::Path::new("shaders/shader.vert.spv"),
-            "vertex shader",
-        )?;
+        let mut internal_state = InternalState::default();
 
-        let tese_shader_module = create_shader_module(
-            vulkan_base,
-            std::path::Path::new("shaders/shader.tese.spv"),
-            "tesselation evaluation shader",
-        )?;
-
-        let tesc_shader_module = create_shader_module(
-            vulkan_base,
-            std::path::Path::new("shaders/shader.tesc.spv"),
-            "tesselation control shader",
-        )?;
-
-        let fragment_shader_module = create_shader_module(
-            vulkan_base,
-            std::path::Path::new("shaders/shader.frag.spv"),
-            "shader",
-        )?;
-
-        let teapot_data = teapot_data::TeapotData::new();
-
-        let control_points_mem_buffer = create_buffer_init(
-            &vulkan_base,
-            teapot_data.get_control_points_slice(),
-            vk::BufferUsageFlags::STORAGE_BUFFER,
-            vk::AccessFlags::SHADER_READ,
-            vk::PipelineStageFlags::VERTEX_SHADER,
-            "control points buffer",
-        )?;
+        if let Err(msg) = new_internal(&mut internal_state, vulkan_base) {
+            clean_internal(&internal_state, vulkan_base);
+            return Err(msg);
+        }
 
         let vulkan_data = VulkanData {
-            vertex_shader_module,
-            tese_shader_module,
-            tesc_shader_module,
-            fragment_shader_module,
-            control_points_mem_buffer,
+            vertex_shader_module: internal_state.vertex_shader_module,
+            tese_shader_module: internal_state.tese_shader_module,
+            tesc_shader_module: internal_state.tesc_shader_module,
+            fragment_shader_module: internal_state.fragment_shader_module,
+            control_points_mem_buffer: internal_state.control_points_mem_buffer.unwrap(),
         };
 
         Ok(vulkan_data)
@@ -69,24 +50,83 @@ impl VulkanData {
     pub fn clean(&self, vulkan_base: &VulkanBase) {
         log::info!("cleaning vulkan data");
 
-        unsafe {
-            vulkan_base
-                .device
-                .destroy_shader_module(self.vertex_shader_module, None);
-            vulkan_base
-                .device
-                .destroy_shader_module(self.tese_shader_module, None);
-            vulkan_base
-                .device
-                .destroy_shader_module(self.tesc_shader_module, None);
-            vulkan_base
-                .device
-                .destroy_shader_module(self.fragment_shader_module, None);
-            let _ = vulkan_base.allocator.destroy_buffer(
-                self.control_points_mem_buffer.buffer,
-                &self.control_points_mem_buffer.allocation,
-            );
-        }
+        let internal_state = InternalState {
+            vertex_shader_module: self.vertex_shader_module,
+            tese_shader_module: self.tese_shader_module,
+            tesc_shader_module: self.tesc_shader_module,
+            fragment_shader_module: self.fragment_shader_module,
+            control_points_mem_buffer: None, //Some(self.control_points_mem_buffer),
+        };
+
+        clean_internal(&internal_state, vulkan_base);
+    }
+}
+
+fn new_internal(
+    internal_state: &mut InternalState,
+    vulkan_base: &VulkanBase,
+) -> Result<(), String> {
+    internal_state.vertex_shader_module = create_shader_module(
+        vulkan_base,
+        std::path::Path::new("shaders/shader.vert.spv"),
+        "vertex shader",
+    )?;
+
+    internal_state.tese_shader_module = create_shader_module(
+        vulkan_base,
+        std::path::Path::new("shaders/shader.tese.spv"),
+        "tesselation evaluation shader",
+    )?;
+
+    internal_state.tesc_shader_module = create_shader_module(
+        vulkan_base,
+        std::path::Path::new("shaders/shader.tesc.spv"),
+        "tesselation control shader",
+    )?;
+
+    internal_state.fragment_shader_module = create_shader_module(
+        vulkan_base,
+        std::path::Path::new("shaders/shader.frag.spv"),
+        "fragment shader",
+    )?;
+
+    let teapot_data = teapot_data::TeapotData::new();
+
+    internal_state.control_points_mem_buffer = Some(create_buffer_init(
+        &vulkan_base,
+        teapot_data.get_control_points_slice(),
+        vk::BufferUsageFlags::STORAGE_BUFFER,
+        vk::AccessFlags::SHADER_READ,
+        vk::PipelineStageFlags::VERTEX_SHADER,
+        "control points buffer",
+    )?);
+
+    Ok(())
+}
+
+fn clean_internal(internal_state: &InternalState, vulkan_base: &VulkanBase) {
+    unsafe {
+        vulkan_base
+            .device
+            .destroy_shader_module(internal_state.vertex_shader_module, None);
+        vulkan_base
+            .device
+            .destroy_shader_module(internal_state.tese_shader_module, None);
+        vulkan_base
+            .device
+            .destroy_shader_module(internal_state.tesc_shader_module, None);
+        vulkan_base
+            .device
+            .destroy_shader_module(internal_state.fragment_shader_module, None);
+
+        internal_state
+            .control_points_mem_buffer
+            .as_ref()
+            .map(|mem_buffer| {
+                vulkan_base
+                    .allocator
+                    .destroy_buffer(mem_buffer.buffer, &mem_buffer.allocation)
+            });
     }
 }
 
