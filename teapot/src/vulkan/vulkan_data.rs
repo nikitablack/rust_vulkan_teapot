@@ -3,6 +3,7 @@ use ash::{version::DeviceV1_0, vk};
 use vulkan::create_buffer_init;
 use vulkan_base::VulkanBase;
 
+#[derive(Clone)]
 pub struct MemBuffer {
     pub buffer: vk::Buffer,
     pub size: vk::DeviceSize,
@@ -55,7 +56,7 @@ impl VulkanData {
             tese_shader_module: self.tese_shader_module,
             tesc_shader_module: self.tesc_shader_module,
             fragment_shader_module: self.fragment_shader_module,
-            control_points_mem_buffer: None, //Some(self.control_points_mem_buffer),
+            control_points_mem_buffer: Some(self.control_points_mem_buffer.clone()),
         };
 
         clean_internal(&internal_state, vulkan_base);
