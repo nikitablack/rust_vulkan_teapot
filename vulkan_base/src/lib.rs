@@ -76,6 +76,11 @@ impl VulkanBase {
             required_device_extensions,
             enable_debug_utils,
         ) {
+            internal_state
+                .allocator
+                .as_mut()
+                .map(|allocator| allocator.destroy());
+
             clean_internal(&mut internal_state);
 
             return Err(msg);
@@ -104,6 +109,8 @@ impl VulkanBase {
     pub fn clean(&mut self) {
         log::info!("cleaning vulkan base");
 
+        self.allocator.destroy();
+
         let mut internal_state = InternalState {
             entry: Some(self.entry.clone()),
             instance: Some(self.instance.clone()),
@@ -118,7 +125,7 @@ impl VulkanBase {
             queue_family: self.queue_family,
             device: Some(self.device.clone()),
             queue: self.queue,
-            allocator: None, //Some(self.allocator),
+            allocator: None,
         };
 
         clean_internal(&mut internal_state);
@@ -206,10 +213,6 @@ fn new_internal<'a, 'b>(
 
 fn clean_internal(state: &mut InternalState) {
     unsafe {
-        state
-            .allocator
-            .as_mut()
-            .map(|allocator| allocator.destroy());
         state
             .device
             .as_ref()
