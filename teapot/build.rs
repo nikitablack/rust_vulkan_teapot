@@ -67,13 +67,19 @@ fn compile_shader(path_buf: &std::path::PathBuf, shader_kind: shaderc::ShaderKin
 
     file_name.push(".spv");
 
-    let spv_path = path_buf
+    let mut spv_path = path_buf
         .parent()
         .expect("failed to get shader file parent folder")
         .join("..")
         .join("..")
-        .join("shaders")
-        .join(file_name);
+        .join("shaders");
+
+    std::fs::create_dir_all(spv_path.clone()).expect(&format!(
+        "failed to create directory for shader {:?}",
+        path_buf
+    ));
+
+    spv_path.push(file_name);
 
     fs::write(spv_path, spv.as_binary_u8()).expect("failed to write shader binary");
 }
