@@ -1,5 +1,7 @@
 pub struct TeapotData {
     control_points: Vec<f32>,
+    patches: Vec<u16>,
+    instances: Vec<f32>,
 }
 
 impl TeapotData {
@@ -43,10 +45,200 @@ impl TeapotData {
             2.40000, 0.7280, -1.3000, 2.40000, 0.0000, -1.3000, 2.40000,
         ];
 
-        Self { control_points }
+        let patches = vec![
+            // rim
+            102, 103, 104, 105, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 102, 103, 104, 105, 4, 5,
+            6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 102, 103, 104, 105, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+            13, 14, 15, 102, 103, 104, 105, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, //
+            // body 1
+            12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 12, 13, 14, 15, 16, 17,
+            18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+            24, 25, 26, 27, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, //
+            // body 2
+            24, 25, 26, 27, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 24, 25, 26, 27, 29, 30,
+            31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 24, 25, 26, 27, 29, 30, 31, 32, 33, 34, 35, 36,
+            37, 38, 39, 40, 24, 25, 26, 27, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, //
+            // lid 1
+            96, 96, 96, 96, 97, 98, 99, 100, 101, 101, 101, 101, 0, 1, 2, 3, 96, 96, 96, 96, 97, 98,
+            99, 100, 101, 101, 101, 101, 0, 1, 2, 3, 96, 96, 96, 96, 97, 98, 99, 100, 101, 101,
+            101, 101, 0, 1, 2, 3, 96, 96, 96, 96, 97, 98, 99, 100, 101, 101, 101, 101, 0, 1, 2,
+            3, //
+            // lid 2
+            0, 1, 2, 3, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 0, 1, 2, 3, 106,
+            107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 0, 1, 2, 3, 106, 107, 108, 109,
+            110, 111, 112, 113, 114, 115, 116, 117, 0, 1, 2, 3, 106, 107, 108, 109, 110, 111, 112,
+            113, 114, 115, 116, 117, //
+            // handle 1
+            41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 41, 45, 49, 53, 42, 46,
+            50, 54, 43, 47, 51, 55, 44, 48, 52, 56, //
+            // handle 2
+            53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 28, 65, 66, 67, 53, 57, 61, 28, 54, 58,
+            62, 65, 55, 59, 63, 66, 56, 60, 64, 67, //
+            // spout 1
+            68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 68, 72, 76, 80, 69, 73,
+            77, 81, 70, 74, 78, 82, 71, 75, 79, 83, //
+            // spout 2
+            80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 80, 84, 88, 92, 81, 85,
+            89, 93, 82, 86, 90, 94, 83, 87, 91, 95,
+        ];
+
+        let mut instances = vec![];
+        // rim instances
+        push_identity(&mut instances);
+        push_color(&mut instances, 1.0f32, 0.0f32, 0.0f32, 1.0f32);
+        push_rotation_z(&mut instances, 90.0f32.to_radians());
+        push_color(&mut instances, 0.0f32, 1.0f32, 0.0f32, 1.0f32);
+        push_rotation_z(&mut instances, 180.0f32.to_radians());
+        push_color(&mut instances, 0.0f32, 0.0f32, 1.0f32, 1.0f32);
+        push_rotation_z(&mut instances, 270.0f32.to_radians());
+        push_color(&mut instances, 1.0f32, 1.0f32, 0.0f32, 1.0f32);
+        // body 1
+        push_identity(&mut instances);
+        push_color(&mut instances, 0.0f32, 0.0f32, 1.0f32, 1.0f32);
+        push_rotation_z(&mut instances, 90.0f32.to_radians());
+        push_color(&mut instances, 1.0f32, 0.0f32, 0.0f32, 1.0f32);
+        push_rotation_z(&mut instances, 180.0f32.to_radians());
+        push_color(&mut instances, 0.0f32, 1.0f32, 0.0f32, 1.0f32);
+        push_rotation_z(&mut instances, 270.0f32.to_radians());
+        push_color(&mut instances, 0.0f32, 1.0f32, 1.0f32, 1.0f32);
+        // body 2
+        push_identity(&mut instances);
+        push_color(&mut instances, 0.0f32, 1.0f32, 0.0f32, 1.0f32);
+        push_rotation_z(&mut instances, 90.0f32.to_radians());
+        push_color(&mut instances, 0.0f32, 0.0f32, 1.0f32, 1.0f32);
+        push_rotation_z(&mut instances, 180.0f32.to_radians());
+        push_color(&mut instances, 1.0f32, 0.0f32, 0.0f32, 1.0f32);
+        push_rotation_z(&mut instances, 270.0f32.to_radians());
+        push_color(&mut instances, 1.0f32, 0.0f32, 1.0f32, 1.0f32);
+
+        // lid 1
+        push_identity(&mut instances);
+        push_color(&mut instances, 0.0f32, 1.0f32, 1.0f32, 1.0f32);
+        push_rotation_z(&mut instances, 90.0f32.to_radians());
+        push_color(&mut instances, 1.0f32, 1.0f32, 0.0f32, 1.0f32);
+        push_rotation_z(&mut instances, 180.0f32.to_radians());
+        push_color(&mut instances, 1.0f32, 0.0f32, 1.0f32, 1.0f32);
+        push_rotation_z(&mut instances, 270.0f32.to_radians());
+        push_color(&mut instances, 1.0f32, 0.0f32, 0.0f32, 1.0f32);
+        // lid 2
+        push_identity(&mut instances);
+        push_color(&mut instances, 0.0f32, 0.0f32, 0.0f32, 1.0f32);
+        push_rotation_z(&mut instances, 90.0f32.to_radians());
+        push_color(&mut instances, 1.0f32, 1.0f32, 1.0f32, 1.0f32);
+        push_rotation_z(&mut instances, 180.0f32.to_radians());
+        push_color(&mut instances, 0.0f32, 1.0f32, 0.0f32, 1.0f32);
+        push_rotation_z(&mut instances, 270.0f32.to_radians());
+        push_color(&mut instances, 0.0f32, 0.0f32, 1.0f32, 1.0f32);
+        // handle 1
+        push_identity(&mut instances);
+        push_color(&mut instances, 0.0f32, 0.0f32, 1.0f32, 1.0f32);
+        push_scale_y(&mut instances, -1.0f32);
+        push_color(&mut instances, 1.0f32, 0.0f32, 0.0f32, 1.0f32);
+        // handle 2
+        push_identity(&mut instances);
+        push_color(&mut instances, 0.0f32, 1.0f32, 0.0f32, 1.0f32);
+        push_scale_y(&mut instances, -1.0f32);
+        push_color(&mut instances, 1.0f32, 1.0f32, 0.0f32, 1.0f32);
+        // spout 1
+        push_identity(&mut instances);
+        push_color(&mut instances, 1.0f32, 0.0f32, 0.0f32, 1.0f32);
+        push_scale_y(&mut instances, -1.0f32);
+        push_color(&mut instances, 1.0f32, 1.0f32, 0.0f32, 1.0f32);
+        // spout 2
+        push_identity(&mut instances);
+        push_color(&mut instances, 0.0f32, 1.0f32, 0.0f32, 1.0f32);
+        push_scale_y(&mut instances, -1.0f32);
+        push_color(&mut instances, 0.0f32, 0.0f32, 1.0f32, 1.0f32);
+
+        Self {
+            control_points,
+            patches,
+            instances,
+        }
     }
 
     pub fn get_control_points_slice(&self) -> &[u8] {
         bytemuck::cast_slice(&self.control_points)
     }
+
+    pub fn get_patches_slice(&self) -> &[u8] {
+        bytemuck::cast_slice(&self.patches)
+    }
+
+    pub fn get_instances_slice(&self) -> &[u8] {
+        bytemuck::cast_slice(&self.instances)
+    }
+}
+
+fn push_rotation_z(v: &mut Vec<f32>, ang_rad: f32) {
+    v.push(ang_rad.cos());
+    v.push(-ang_rad.sin());
+    v.push(0.0f32);
+    v.push(0.0f32);
+    //
+    v.push(ang_rad.sin());
+    v.push(ang_rad.cos());
+    v.push(0.0f32);
+    v.push(0.0f32);
+    //
+    v.push(0.0f32);
+    v.push(0.0f32);
+    v.push(1.0f32);
+    v.push(0.0f32);
+    //
+    v.push(0.0f32);
+    v.push(0.0f32);
+    v.push(0.0f32);
+    v.push(1.0f32);
+}
+
+fn push_scale_y(v: &mut Vec<f32>, s: f32) {
+    v.push(1.0f32);
+    v.push(0.0f32);
+    v.push(0.0f32);
+    v.push(0.0f32);
+    //
+    v.push(0.0f32);
+    v.push(s);
+    v.push(0.0f32);
+    v.push(0.0f32);
+    //
+    v.push(0.0f32);
+    v.push(0.0f32);
+    v.push(1.0f32);
+    v.push(0.0f32);
+    //
+    v.push(0.0f32);
+    v.push(0.0f32);
+    v.push(0.0f32);
+    v.push(1.0f32);
+}
+
+fn push_identity(v: &mut Vec<f32>) {
+    v.push(1.0f32);
+    v.push(0.0f32);
+    v.push(0.0f32);
+    v.push(0.0f32);
+    //
+    v.push(0.0f32);
+    v.push(1.0f32);
+    v.push(0.0f32);
+    v.push(0.0f32);
+    //
+    v.push(0.0f32);
+    v.push(0.0f32);
+    v.push(1.0f32);
+    v.push(0.0f32);
+    //
+    v.push(0.0f32);
+    v.push(0.0f32);
+    v.push(0.0f32);
+    v.push(1.0f32);
+}
+
+fn push_color(v: &mut Vec<f32>, r: f32, g: f32, b: f32, a: f32) {
+    v.push(r);
+    v.push(g);
+    v.push(b);
+    v.push(a);
 }
