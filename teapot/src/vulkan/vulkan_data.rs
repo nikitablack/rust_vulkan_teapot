@@ -18,7 +18,7 @@ pub struct VulkanData {
     pub control_points_mem_buffer: MemBuffer,
     pub patches_mem_buffer: MemBuffer,
     pub instances_mem_buffer: MemBuffer,
-    pub uniform_mem_buffer: MemBuffer,
+    pub uniform_mem_buffers: Vec<MemBuffer>,
 }
 
 #[derive(Default)]
@@ -30,7 +30,7 @@ struct InternalState {
     control_points_mem_buffer: Option<MemBuffer>,
     patches_mem_buffer: Option<MemBuffer>,
     instances_mem_buffer: Option<MemBuffer>,
-    uniform_mem_buffer: Option<MemBuffer>,
+    uniform_mem_buffers: Vec<Option<MemBuffer>>,
 }
 
 impl VulkanData {
@@ -50,7 +50,11 @@ impl VulkanData {
             control_points_mem_buffer: internal_state.control_points_mem_buffer.unwrap(),
             patches_mem_buffer: internal_state.patches_mem_buffer.unwrap(),
             instances_mem_buffer: internal_state.instances_mem_buffer.unwrap(),
-            uniform_mem_buffer: internal_state.uniform_mem_buffer.unwrap(),
+            uniform_mem_buffers: internal_state
+                .uniform_mem_buffers
+                .into_iter()
+                .map(|mem_buffer| mem_buffer.unwrap())
+                .collect(),
         };
 
         Ok(vulkan_data)
@@ -67,7 +71,11 @@ impl VulkanData {
             control_points_mem_buffer: Some(self.control_points_mem_buffer.clone()),
             patches_mem_buffer: Some(self.patches_mem_buffer.clone()),
             instances_mem_buffer: Some(self.instances_mem_buffer.clone()),
-            uniform_mem_buffer: Some(self.uniform_mem_buffer.clone()),
+            uniform_mem_buffers: self
+                .uniform_mem_buffers
+                .iter()
+                .map(|mem_buffer| Some(mem_buffer.clone()))
+                .collect(),
         };
 
         clean_internal(&internal_state, vulkan_base);
@@ -131,14 +139,18 @@ fn new_internal(
         "instances buffer",
     )?);
 
-    internal_state.uniform_mem_buffer = Some(vulkan::create_buffer(
-        vulkan_base,
-        (16 * std::mem::size_of::<f32>()) as vk::DeviceSize,
-        vk::BufferUsageFlags::STORAGE_BUFFER,
-        vk_mem::MemoryUsage::CpuToGpu,
-        vk_mem::AllocationCreateFlags::MAPPED,
-        "uniform buffer",
-    )?);
+    for i in 0..crate::CONCURRENT_FRAME_COUNT {
+        let buffer = Some(vulkan::create_buffer(
+            vulkan_base,
+            (16 * std::mem::size_of::<f32>()) as vk::DeviceSize,
+            vk::BufferUsageFlags::STORAGE_BUFFER,
+            vk_mem::MemoryUsage::CpuToGpu,
+            vk_mem::AllocationCreateFlags::MAPPED,
+            &format!("uniform buffer {}", i),
+        )?);
+
+        internal_state.uniform_mem_buffers.push(buffer);
+    }
 
     Ok(())
 }
@@ -185,14 +197,13 @@ fn clean_internal(internal_state: &InternalState, vulkan_base: &VulkanBase) {
                     .destroy_buffer(mem_buffer.buffer, &mem_buffer.allocation)
             });
 
-        internal_state
-            .uniform_mem_buffer
-            .as_ref()
-            .map(|mem_buffer| {
+        for b in &internal_state.uniform_mem_buffers {
+            b.as_ref().map(|mem_buffer| {
                 vulkan_base
                     .allocator
                     .destroy_buffer(mem_buffer.buffer, &mem_buffer.allocation)
             });
+        }
     }
 }
 
