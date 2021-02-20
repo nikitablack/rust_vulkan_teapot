@@ -24,6 +24,7 @@ pub struct VulkanData {
     pub pipeline_layout: vk::PipelineLayout,
     pub render_pass: vk::RenderPass,
     pub solid_pipeline: vk::Pipeline,
+    pub wireframe_pipeline: vk::Pipeline,
 }
 
 #[derive(Default)]
@@ -41,6 +42,7 @@ struct InternalState {
     pipeline_layout: vk::PipelineLayout,
     render_pass: vk::RenderPass,
     solid_pipeline: vk::Pipeline,
+    wireframe_pipeline: vk::Pipeline,
 }
 
 impl VulkanData {
@@ -70,6 +72,7 @@ impl VulkanData {
             pipeline_layout: internal_state.pipeline_layout,
             render_pass: internal_state.render_pass,
             solid_pipeline: internal_state.solid_pipeline,
+            wireframe_pipeline: internal_state.wireframe_pipeline,
         };
 
         Ok(vulkan_data)
@@ -96,6 +99,7 @@ impl VulkanData {
             pipeline_layout: self.pipeline_layout,
             render_pass: self.render_pass,
             solid_pipeline: self.solid_pipeline,
+            wireframe_pipeline: self.wireframe_pipeline,
         };
 
         clean_internal(&internal_state, vulkan_base);
@@ -177,7 +181,7 @@ fn new_internal(
     internal_state.pipeline_layout =
         create_pipeline_layout(vulkan_base, internal_state.descriptor_set_layout)?;
     internal_state.render_pass = create_render_pass(vulkan_base)?;
-    internal_state.solid_pipeline = create_pipeline(
+    let (solid_pipeline, wireframe_pipeline) = create_pipelines(
         vulkan_base,
         internal_state.vertex_shader_module,
         internal_state.tesc_shader_module,
@@ -186,6 +190,8 @@ fn new_internal(
         internal_state.pipeline_layout,
         internal_state.render_pass,
     )?;
+    internal_state.solid_pipeline = solid_pipeline;
+    internal_state.wireframe_pipeline = wireframe_pipeline;
 
     Ok(())
 }
@@ -255,6 +261,14 @@ fn clean_internal(internal_state: &InternalState, vulkan_base: &VulkanBase) {
         vulkan_base
             .device
             .destroy_render_pass(internal_state.render_pass, None);
+
+        vulkan_base
+            .device
+            .destroy_pipeline(internal_state.solid_pipeline, None);
+
+        vulkan_base
+            .device
+            .destroy_pipeline(internal_state.wireframe_pipeline, None);
     }
 }
 
@@ -442,7 +456,7 @@ fn create_render_pass(vulkan_base: &vulkan_base::VulkanBase) -> Result<vk::Rende
     Ok(render_pass)
 }
 
-fn create_pipeline(
+fn create_pipelines(
     vulkan_base: &vulkan_base::VulkanBase,
     vertex_shader_module: vk::ShaderModule,
     tess_control_shader_module: vk::ShaderModule,
@@ -450,7 +464,7 @@ fn create_pipeline(
     fragment_shader_module: vk::ShaderModule,
     pipeline_layout: vk::PipelineLayout,
     render_pass: vk::RenderPass,
-) -> Result<vk::Pipeline, String> {
+) -> Result<(vk::Pipeline, vk::Pipeline), String> {
     let shader_entry_name = std::ffi::CString::new("main").unwrap();
 
     let vs_state = vk::PipelineShaderStageCreateInfo::builder()
@@ -475,6 +489,10 @@ fn create_pipeline(
         .stage(vk::ShaderStageFlags::FRAGMENT)
         .module(fragment_shader_module)
         .name(&shader_entry_name)
+        .build();
+
+    let ia_state = vk::PipelineInputAssemblyStateCreateInfo::builder()
+        .topology(vk::PrimitiveTopology::PATCH_LIST)
         .build();
 
     let raster_state = vk::PipelineRasterizationStateCreateInfo::builder()
@@ -519,9 +537,13 @@ fn create_pipeline(
         .build();
 
     let stages = [vs_state, tc_state, te_state, fs_state];
-    let create_info = vk::GraphicsPipelineCreateInfo::builder()
-        .flags(vk::PipelineCreateFlags::empty())
+
+    let vert_inp_state = vk::PipelineVertexInputStateCreateInfo::builder().build();
+
+    let solid_pipeline_create_info = vk::GraphicsPipelineCreateInfo::builder()
+        .flags(vk::PipelineCreateFlags::ALLOW_DERIVATIVES)
         .stages(&stages)
+        .input_assembly_state(&ia_state)
         .rasterization_state(&raster_state)
         .color_blend_state(&col_blend_state)
         .dynamic_state(&dyn_state)
@@ -531,16 +553,33 @@ fn create_pipeline(
         .viewport_state(&viewport_state)
         .multisample_state(&multisample_state)
         .tessellation_state(&tessellation_state)
+        .vertex_input_state(&vert_inp_state)
         .build();
+
+    let raster_state = vk::PipelineRasterizationStateCreateInfo::builder()
+        .polygon_mode(vk::PolygonMode::LINE)
+        .cull_mode(vk::CullModeFlags::NONE)
+        .front_face(vk::FrontFace::CLOCKWISE)
+        .line_width(1.0f32)
+        .build();
+
+    let mut wireframe_pipeline_create_info = solid_pipeline_create_info;
+    wireframe_pipeline_create_info.p_rasterization_state = &raster_state;
+    wireframe_pipeline_create_info.base_pipeline_index = 0;
 
     let pipelines = unsafe {
         vulkan_base
             .device
-            .create_graphics_pipelines(vk::PipelineCache::null(), &[create_info], None)
+            .create_graphics_pipelines(
+                vk::PipelineCache::null(),
+                &[solid_pipeline_create_info, wireframe_pipeline_create_info],
+                None,
+            )
             .map_err(|_| String::from("failed to create solid pipeline"))?
     };
 
     let solid_pipeline = pipelines[0];
+    let wireframe_pipeline = pipelines[1];
 
     vulkan::set_debug_utils_object_name(
         &vulkan_base.debug_utils_loader,
@@ -549,5 +588,12 @@ fn create_pipeline(
         "solid pipeline",
     );
 
-    Ok(solid_pipeline)
+    vulkan::set_debug_utils_object_name(
+        &vulkan_base.debug_utils_loader,
+        vulkan_base.device.handle(),
+        wireframe_pipeline,
+        "wireframe pipeline",
+    );
+
+    Ok((solid_pipeline, wireframe_pipeline))
 }
