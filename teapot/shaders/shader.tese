@@ -8,24 +8,14 @@ struct PatchData
     vec4 color;
 };
 
-layout(set = 0, binding = 0, row_major) readonly buffer StorageBuffer
+layout(set = 0, binding = 1, row_major) readonly buffer StorageBuffer
 {
     PatchData patchData[];
 };
 
-layout(set = 0, binding = 1) uniform ProjectionUniformBuffer
+layout(set = 0, binding = 2) uniform UniformBuffer
 {
-    layout(row_major) mat4 projectionMatrix;
-};
-
-layout(set = 0, binding = 2) uniform ViewUniformBuffer
-{
-    layout(row_major) mat4 viewMatrix;
-};
-
-layout(set = 0, binding = 3) uniform ModelUniformBuffer
-{
-    layout(row_major) mat4 modelMatrix;
+    layout(row_major) mat4 mvpMatrix;
 };
 
 layout (location = 0) out vec3 outColor;
@@ -60,7 +50,7 @@ void main(void)
 
     vec4 localPos = evaluateBezier(basisU, basisV);
 
-    gl_Position = localPos * patchData[gl_PrimitiveID].transform * modelMatrix * viewMatrix * projectionMatrix;
+    gl_Position = localPos * patchData[gl_PrimitiveID].transform * mvpMatrix;
 
     outColor = patchData[gl_PrimitiveID].color.xyz;
 }
