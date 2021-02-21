@@ -154,12 +154,12 @@ fn create_buffer_init_internal(
         &format!("staging {}", object_name),
     )?;
 
-    unsafe {
-        let allocation_info = vulkan_base
-            .allocator
-            .get_allocation_info(&staging_mem_buffer.allocation)
-            .map_err(|_| format!("failed to get allocation info for {}", object_name))?;
+    let allocation_info = vulkan_base
+        .allocator
+        .get_allocation_info(&staging_mem_buffer.allocation)
+        .map_err(|_| format!("failed to get allocation info for {}", object_name))?;
 
+    unsafe {
         std::ptr::copy_nonoverlapping(
             init_data.as_ptr(),
             allocation_info.get_mapped_data(),
