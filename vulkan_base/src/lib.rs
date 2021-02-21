@@ -151,7 +151,7 @@ fn new_internal<'a, 'b>(
             .map_err(|_| String::from("failed to create surface"))?
     };
 
-    state.physical_device = get_physical_device(&instance, &required_device_extensions)?;
+    state.physical_device = get_physical_device(instance, &required_device_extensions)?;
     state.physical_device_properties =
         unsafe { instance.get_physical_device_properties(state.physical_device) };
     state.surface_format =
