@@ -45,7 +45,6 @@ pub fn create_buffer(
         buffer,
         size,
         allocation,
-        allocation_info,
     })
 }
 
@@ -95,7 +94,6 @@ pub fn create_buffer_with_flags(
         buffer,
         size,
         allocation,
-        allocation_info,
     })
 }
 
@@ -156,10 +154,15 @@ fn create_buffer_init_internal(
         &format!("staging {}", object_name),
     )?;
 
+    let allocation_info = vulkan_base
+        .allocator
+        .get_allocation_info(&staging_mem_buffer.allocation)
+        .map_err(|_| format!("failed to get allocation info for {}", object_name))?;
+
     unsafe {
         std::ptr::copy_nonoverlapping(
             init_data.as_ptr(),
-            staging_mem_buffer.allocation_info.get_mapped_data(),
+            allocation_info.get_mapped_data(),
             init_data.len(),
         )
     };
