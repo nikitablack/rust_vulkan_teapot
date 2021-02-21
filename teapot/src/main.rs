@@ -34,7 +34,7 @@ fn main() {
 
     // vulkan base
     let enable_debug_utils = true;
-    let device_extensions = vec![];
+    let device_extensions = vec![ash::extensions::khr::Swapchain::name()];
     let instance_extensions =
         vulkan::get_required_instance_extensions(&window, enable_debug_utils).unwrap();
 
@@ -103,7 +103,9 @@ fn main() {
                 if window_resized {
                     window_resized = false;
 
-                    // TODO handle resize
+                    if let Err(msg) = vk_base.resize(&window) {
+                        panic!(msg);
+                    }
                 }
 
                 // TODO draw

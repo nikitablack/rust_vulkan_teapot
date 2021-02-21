@@ -3,11 +3,16 @@ mod check_required_instance_extensions;
 mod create_allocator;
 mod create_instance;
 mod create_logical_device;
+mod create_swapchain;
 mod get_depth_format;
 mod get_physical_device;
 mod get_present_mode;
 mod get_queue_family;
+mod get_surface_capabilities;
+mod get_surface_extent;
 mod get_surface_format;
+mod get_swapchain_image_views;
+mod get_swapchain_images;
 
 use ash::extensions::khr;
 use ash::version::DeviceV1_0;
@@ -19,16 +24,22 @@ use check_required_instance_extensions::*;
 use create_allocator::*;
 use create_instance::*;
 use create_logical_device::*;
+use create_swapchain::*;
 use get_depth_format::*;
 use get_physical_device::*;
 use get_present_mode::*;
 use get_queue_family::*;
+use get_surface_capabilities::*;
+use get_surface_extent::*;
 use get_surface_format::*;
+use get_swapchain_image_views::*;
+use get_swapchain_images::*;
 
 pub struct VulkanBase {
     pub entry: ash::Entry,
     pub instance: ash::Instance,
     pub surface_loader: khr::Surface,
+    pub swapchain_loader: khr::Swapchain,
     pub debug_utils_loader: Option<ash::extensions::ext::DebugUtils>,
     pub surface: vk::SurfaceKHR,
     pub physical_device: vk::PhysicalDevice,
@@ -40,6 +51,11 @@ pub struct VulkanBase {
     pub device: ash::Device,
     pub queue: vk::Queue,
     pub allocator: vk_mem::Allocator,
+    pub surface_capabilities: vk::SurfaceCapabilitiesKHR,
+    pub surface_extent: vk::Extent2D,
+    pub swapchain: vk::SwapchainKHR,
+    pub swapchain_images: Vec<vk::Image>,
+    pub swapchain_image_views: Vec<vk::ImageView>,
 }
 
 #[derive(Default)]
@@ -47,6 +63,7 @@ struct InternalState {
     entry: Option<ash::Entry>,
     instance: Option<ash::Instance>,
     surface_loader: Option<khr::Surface>,
+    swapchain_loader: Option<khr::Swapchain>,
     debug_utils_loader: Option<ash::extensions::ext::DebugUtils>,
     surface: vk::SurfaceKHR,
     physical_device: vk::PhysicalDevice,
@@ -58,6 +75,11 @@ struct InternalState {
     device: Option<ash::Device>,
     queue: vk::Queue,
     allocator: Option<vk_mem::Allocator>,
+    surface_capabilities: vk::SurfaceCapabilitiesKHR,
+    surface_extent: vk::Extent2D,
+    swapchain: vk::SwapchainKHR,
+    swapchain_images: Vec<vk::Image>,
+    swapchain_image_views: Vec<vk::ImageView>,
 }
 
 impl VulkanBase {
@@ -91,6 +113,7 @@ impl VulkanBase {
             instance: internal_state.instance.unwrap(),
             debug_utils_loader: internal_state.debug_utils_loader,
             surface_loader: internal_state.surface_loader.unwrap(),
+            swapchain_loader: internal_state.swapchain_loader.unwrap(),
             surface: internal_state.surface,
             physical_device: internal_state.physical_device,
             physical_device_properties: internal_state.physical_device_properties,
@@ -101,20 +124,22 @@ impl VulkanBase {
             device: internal_state.device.unwrap(),
             queue: internal_state.queue,
             allocator: internal_state.allocator.unwrap(),
+            surface_capabilities: internal_state.surface_capabilities,
+            surface_extent: internal_state.surface_extent,
+            swapchain: internal_state.swapchain,
+            swapchain_images: internal_state.swapchain_images,
+            swapchain_image_views: internal_state.swapchain_image_views,
         };
 
         Ok(vulkan_base)
     }
 
-    pub fn clean(&mut self) {
-        log::info!("cleaning vulkan base");
-
-        self.allocator.destroy();
-
+    pub fn resize(&mut self, window: &winit::window::Window) -> Result<(), String> {
         let mut internal_state = InternalState {
             entry: Some(self.entry.clone()),
             instance: Some(self.instance.clone()),
             surface_loader: Some(self.surface_loader.clone()),
+            swapchain_loader: Some(self.swapchain_loader.clone()),
             debug_utils_loader: self.debug_utils_loader.clone(),
             surface: self.surface,
             physical_device: self.physical_device,
@@ -126,6 +151,57 @@ impl VulkanBase {
             device: Some(self.device.clone()),
             queue: self.queue,
             allocator: None,
+            surface_capabilities: self.surface_capabilities,
+            surface_extent: self.surface_extent,
+            swapchain: self.swapchain,
+            swapchain_images: self.swapchain_images.clone(),
+            swapchain_image_views: self.swapchain_image_views.clone(),
+        };
+
+        if let Err(msg) = resize_internal(&mut internal_state, window) {
+            internal_state
+                .allocator
+                .as_mut()
+                .map(|allocator| allocator.destroy());
+
+            clean_internal(&mut internal_state);
+
+            return Err(msg);
+        }
+
+        self.swapchain = internal_state.swapchain;
+        self.swapchain_images = internal_state.swapchain_images;
+        self.swapchain_image_views = internal_state.swapchain_image_views;
+
+        Ok(())
+    }
+
+    pub fn clean(&mut self) {
+        log::info!("cleaning vulkan base");
+
+        self.allocator.destroy();
+
+        let mut internal_state = InternalState {
+            entry: Some(self.entry.clone()),
+            instance: Some(self.instance.clone()),
+            surface_loader: Some(self.surface_loader.clone()),
+            swapchain_loader: Some(self.swapchain_loader.clone()),
+            debug_utils_loader: self.debug_utils_loader.clone(),
+            surface: self.surface,
+            physical_device: self.physical_device,
+            physical_device_properties: self.physical_device_properties,
+            surface_format: self.surface_format,
+            present_mode: self.present_mode,
+            depth_format: self.depth_format,
+            queue_family: self.queue_family,
+            device: Some(self.device.clone()),
+            queue: self.queue,
+            allocator: None,
+            surface_capabilities: self.surface_capabilities,
+            surface_extent: self.surface_extent,
+            swapchain: self.swapchain,
+            swapchain_images: self.swapchain_images.clone(),
+            swapchain_image_views: self.swapchain_image_views.clone(),
         };
 
         clean_internal(&mut internal_state);
@@ -164,7 +240,7 @@ fn new_internal<'a, 'b>(
             .map_err(|_| String::from("failed to create surface"))?
     };
 
-    state.physical_device = get_physical_device(&instance, &required_device_extensions)?;
+    state.physical_device = get_physical_device(instance, &required_device_extensions)?;
     state.physical_device_properties =
         unsafe { instance.get_physical_device_properties(state.physical_device) };
     state.surface_format =
@@ -206,7 +282,51 @@ fn new_internal<'a, 'b>(
     let device = state.device.as_ref().unwrap();
 
     state.queue = unsafe { device.get_device_queue(state.queue_family, 0) };
-    state.allocator = Some(create_allocator(&instance, device, state.physical_device)?);
+    state.allocator = Some(create_allocator(instance, device, state.physical_device)?);
+    state.swapchain_loader = Some(ash::extensions::khr::Swapchain::new(instance, device));
+
+    resize_internal(state, window)?;
+
+    Ok(())
+}
+
+fn resize_internal(
+    state: &mut InternalState,
+    window: &winit::window::Window,
+) -> Result<(), String> {
+    state.surface_capabilities = get_surface_capabilities(
+        state.surface_loader.as_ref().unwrap(),
+        state.physical_device,
+        state.surface,
+    )?;
+    state.surface_extent = get_surface_extent(window, &state.surface_capabilities);
+    state.swapchain = create_swapchain(
+        state.swapchain,
+        state.surface,
+        &state.surface_capabilities,
+        &state.surface_format,
+        state.surface_extent,
+        state.present_mode,
+        state.swapchain_loader.as_ref().unwrap(),
+    )?;
+    state.swapchain_images =
+        get_swapchain_images(state.swapchain_loader.as_ref().unwrap(), state.swapchain)?;
+
+    for &image_view in &state.swapchain_image_views {
+        unsafe {
+            state
+                .device
+                .as_ref()
+                .unwrap()
+                .destroy_image_view(image_view, None);
+        };
+    }
+
+    state.swapchain_image_views = get_swapchain_image_views(
+        state.device.as_ref().unwrap(),
+        &state.swapchain_images,
+        &state.surface_format,
+    )?;
 
     Ok(())
 }
@@ -214,9 +334,15 @@ fn new_internal<'a, 'b>(
 fn clean_internal(state: &mut InternalState) {
     unsafe {
         state
-            .device
+            .swapchain_loader
             .as_ref()
-            .map(|device| device.destroy_device(None));
+            .map(|swapchain_loader| swapchain_loader.destroy_swapchain(state.swapchain, None));
+        state.device.as_ref().map(|device| {
+            for &image_view in &state.swapchain_image_views {
+                device.destroy_image_view(image_view, None);
+            }
+            device.destroy_device(None)
+        });
         state
             .surface_loader
             .as_ref()
