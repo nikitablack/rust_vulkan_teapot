@@ -169,6 +169,8 @@ impl VulkanBase {
             return Err(msg);
         }
 
+        self.surface_capabilities = internal_state.surface_capabilities;
+        self.surface_extent = internal_state.surface_extent;
         self.swapchain = internal_state.swapchain;
         self.swapchain_images = internal_state.swapchain_images;
         self.swapchain_image_views = internal_state.swapchain_image_views;

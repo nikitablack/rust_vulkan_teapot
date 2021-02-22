@@ -52,7 +52,7 @@ fn main() {
     };
 
     // vulkan data
-    let vk_data = match VulkanData::new(&vk_base) {
+    let mut vk_data = match VulkanData::new(&vk_base) {
         Ok(vk_data) => vk_data,
         Err(msg) => {
             log::error!("{}", msg);
@@ -103,7 +103,13 @@ fn main() {
                 if window_resized {
                     window_resized = false;
 
+                    log::info!("handling resize");
+
                     if let Err(msg) = vk_base.resize(&window) {
+                        panic!(msg);
+                    }
+
+                    if let Err(msg) = vk_data.resize(&vk_base) {
                         panic!(msg);
                     }
                 }
