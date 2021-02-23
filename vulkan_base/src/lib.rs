@@ -296,6 +296,10 @@ fn resize_internal(
     state: &mut InternalState,
     window: &winit::window::Window,
 ) -> Result<(), String> {
+    unsafe {
+        let _ = state.device.as_ref().unwrap().device_wait_idle();
+    }
+
     state.surface_capabilities = get_surface_capabilities(
         state.surface_loader.as_ref().unwrap(),
         state.physical_device,
