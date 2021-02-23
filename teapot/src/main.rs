@@ -114,15 +114,19 @@ fn main() {
                     }
                 }
 
-                // TODO draw
+                if let Err(msg) = vulkan::draw(&mut vk_data, &vk_base) {
+                    panic!(msg);
+                }
+
+                vk_data.frame_index = (vk_data.frame_index + 1) % CONCURRENT_FRAME_COUNT;
             }
 
             Event::WindowEvent {
-                event: WindowEvent::Resized { .. },
+                event: WindowEvent::Resized(physical_size),
                 ..
             } => {
                 window_resized = true;
-                log::info!("resize requested");
+                log::info!("resize requested {:?}", physical_size);
             }
 
             _ => {}

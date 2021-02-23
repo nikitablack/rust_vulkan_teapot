@@ -35,6 +35,14 @@ pub struct VulkanData {
     pub solid_pipeline: vk::Pipeline,
     pub wireframe_pipeline: vk::Pipeline,
     pub framebuffers: Vec<vk::Framebuffer>,
+    pub image_available_semaphore: vk::Semaphore,
+    pub rendering_finished_semaphore: vk::Semaphore,
+    pub fences: Vec<vk::Fence>,
+    pub command_pools: Vec<vk::CommandPool>,
+
+    pub available_command_buffers: Vec<Vec<vk::CommandBuffer>>,
+    pub used_command_buffers: Vec<Vec<vk::CommandBuffer>>,
+    pub frame_index: u32,
 }
 
 impl VulkanData {
@@ -126,6 +134,22 @@ impl VulkanData {
 
             for &framebuffer in &self.framebuffers {
                 vulkan_base.device.destroy_framebuffer(framebuffer, None);
+            }
+
+            vulkan_base
+                .device
+                .destroy_semaphore(self.image_available_semaphore, None);
+
+            vulkan_base
+                .device
+                .destroy_semaphore(self.rendering_finished_semaphore, None);
+
+            for &fence in &self.fences {
+                vulkan_base.device.destroy_fence(fence, None);
+            }
+
+            for &command_pool in &self.command_pools {
+                vulkan_base.device.destroy_command_pool(command_pool, None);
             }
         }
     }
@@ -219,6 +243,15 @@ fn new_internal(vulkan_data: &mut VulkanData, vulkan_base: &VulkanBase) -> Resul
         vulkan_data.render_pass,
         vulkan_base.surface_extent,
     )?;
+    vulkan_data.image_available_semaphore =
+        create_semaphore(vulkan_base, "image available semaphore")?;
+    vulkan_data.rendering_finished_semaphore =
+        create_semaphore(vulkan_base, "rendering finished semaphore")?;
+
+    vulkan_data.fences = create_fences(vulkan_base)?;
+    vulkan_data.command_pools = create_command_pools(vulkan_base)?;
+    vulkan_data.available_command_buffers = vec![vec![]; crate::CONCURRENT_FRAME_COUNT as usize];
+    vulkan_data.used_command_buffers = vec![vec![]; crate::CONCURRENT_FRAME_COUNT as usize];
 
     Ok(())
 }
@@ -590,4 +623,92 @@ fn create_framebuffers(
     }
 
     Ok(framebuffers)
+}
+
+fn create_semaphore(vulkan_base: &VulkanBase, object_name: &str) -> Result<vk::Semaphore, String> {
+    let create_info = vk::SemaphoreCreateInfo::default();
+
+    let semaphore = unsafe {
+        vulkan_base
+            .device
+            .create_semaphore(&create_info, None)
+            .map_err(|_| format!("failed to create {}", object_name))?
+    };
+
+    vulkan::set_debug_utils_object_name(
+        &vulkan_base.debug_utils_loader,
+        vulkan_base.device.handle(),
+        semaphore,
+        object_name,
+    );
+
+    Ok(semaphore)
+}
+
+fn create_fences(vulkan_base: &VulkanBase) -> Result<Vec<vk::Fence>, String> {
+    let create_info = vk::FenceCreateInfo::builder()
+        .flags(vk::FenceCreateFlags::SIGNALED)
+        .build();
+
+    let mut fences = Vec::with_capacity(crate::CONCURRENT_FRAME_COUNT as usize);
+
+    for i in 0..crate::CONCURRENT_FRAME_COUNT {
+        let fence = unsafe {
+            vulkan_base
+                .device
+                .create_fence(&create_info, None)
+                .map_err(|_| {
+                    for &f in &fences {
+                        vulkan_base.device.destroy_fence(f, None);
+                    }
+
+                    format!("failed to create fence {}", i)
+                })?
+        };
+
+        fences.push(fence);
+
+        vulkan::set_debug_utils_object_name(
+            &vulkan_base.debug_utils_loader,
+            vulkan_base.device.handle(),
+            fence,
+            &format!("fence {}", i),
+        );
+    }
+
+    Ok(fences)
+}
+
+fn create_command_pools(vulkan_base: &VulkanBase) -> Result<Vec<vk::CommandPool>, String> {
+    let create_info = vk::CommandPoolCreateInfo::builder()
+        .flags(vk::CommandPoolCreateFlags::TRANSIENT)
+        .queue_family_index(vulkan_base.queue_family);
+
+    let mut command_pools = Vec::with_capacity(crate::CONCURRENT_FRAME_COUNT as usize);
+
+    for i in 0..crate::CONCURRENT_FRAME_COUNT {
+        let command_pool = unsafe {
+            vulkan_base
+                .device
+                .create_command_pool(&create_info, None)
+                .map_err(|_| {
+                    for &cp in &command_pools {
+                        vulkan_base.device.destroy_command_pool(cp, None);
+                    }
+
+                    format!("failed to create command pool {}", i)
+                })?
+        };
+
+        command_pools.push(command_pool);
+
+        vulkan::set_debug_utils_object_name(
+            &vulkan_base.debug_utils_loader,
+            vulkan_base.device.handle(),
+            command_pool,
+            &format!("command pool {}", i),
+        );
+    }
+
+    Ok(command_pools)
 }
