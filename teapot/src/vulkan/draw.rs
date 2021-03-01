@@ -2,7 +2,7 @@ use crate::vulkan;
 use crate::VulkanData;
 use ash::version::DeviceV1_0;
 use ash::vk;
-use cgmath::{perspective, Deg, Matrix4, Point3, Vector3};
+use cgmath::{num_traits::ToPrimitive, perspective, Deg, Matrix4, Point3, Vector3};
 use vulkan_base::VulkanBase;
 
 fn get_image_index(vulkan_data: &VulkanData, vulkan_base: &VulkanBase) -> Result<u32, String> {
@@ -401,7 +401,21 @@ pub fn draw(
         Point3::<f32>::new(0.0, 0.0, 0.0),
         Vector3::<f32>::new(0.0, 1.0, 0.0),
     );
-    let projection = perspective(Deg::<f32>(45.0), 800.0 / 600.0, 0.1, 100.0);
+    let projection = perspective(
+        Deg::<f32>(45.0),
+        vulkan_base
+            .surface_extent
+            .width
+            .to_f32()
+            .expect("failed to convert surface width to f32")
+            / vulkan_base
+                .surface_extent
+                .height
+                .to_f32()
+                .expect("failed to convert surface width to f32"),
+        0.1,
+        100.0,
+    );
 
     let mvp = projection * view * model;
 
