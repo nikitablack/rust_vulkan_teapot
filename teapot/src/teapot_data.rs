@@ -168,6 +168,10 @@ impl TeapotData {
     pub fn get_instances_slice(&self) -> &[u8] {
         bytemuck::cast_slice(&self.instances)
     }
+
+    pub fn get_patch_point_count(&self) -> u32 {
+        self.patches.len() as u32
+    }
 }
 
 fn push_rotation_z(v: &mut Vec<f32>, ang_rad: f32) {

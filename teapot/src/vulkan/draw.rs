@@ -1,6 +1,8 @@
+use crate::vulkan;
 use crate::VulkanData;
 use ash::version::DeviceV1_0;
 use ash::vk;
+use cgmath::{perspective, Deg, Matrix4, Point3, Vector3};
 use vulkan_base::VulkanBase;
 
 fn get_image_index(vulkan_data: &VulkanData, vulkan_base: &VulkanBase) -> Result<u32, String> {
@@ -141,7 +143,7 @@ fn begin_render_pass(
     command_buffer: vk::CommandBuffer,
 ) {
     let clear_color = vk::ClearColorValue {
-        float32: [0.5f32, 0.1f32, 0.1f32, 0.1f32],
+        float32: [0.5f32, 0.5f32, 0.5f32, 1.0f32],
     };
     let clear_values = vec![vk::ClearValue { color: clear_color }];
 
@@ -152,7 +154,8 @@ fn begin_render_pass(
             offset: vk::Offset2D { x: 0, y: 0 },
             extent: vulkan_base.surface_extent,
         })
-        .clear_values(&clear_values);
+        .clear_values(&clear_values)
+        .build();
 
     unsafe {
         vulkan_base.device.cmd_begin_render_pass(
@@ -177,6 +180,133 @@ fn set_viewport(vulkan_base: &VulkanBase, command_buffer: vk::CommandBuffer) {
         vulkan_base
             .device
             .cmd_set_viewport(command_buffer, 0, &[viewport]);
+    }
+}
+
+fn set_scissor(vulkan_base: &VulkanBase, command_buffer: vk::CommandBuffer) {
+    let scissor = vk::Rect2D {
+        offset: vk::Offset2D { x: 0, y: 0 },
+        extent: vk::Extent2D {
+            width: vulkan_base.surface_extent.width,
+            height: vulkan_base.surface_extent.height,
+        },
+    };
+
+    unsafe {
+        vulkan_base
+            .device
+            .cmd_set_scissor(command_buffer, 0, &[scissor]);
+    }
+}
+
+fn reset_descriptor_pool(
+    vulkan_data: &mut VulkanData,
+    vulkan_base: &VulkanBase,
+) -> Result<(), String> {
+    let descriptor_pool = vulkan_data.descriptor_pools[vulkan_data.frame_index as usize];
+
+    unsafe {
+        let frame_index = vulkan_data.frame_index;
+
+        vulkan_base
+            .device
+            .reset_descriptor_pool(descriptor_pool, vk::DescriptorPoolResetFlags::empty())
+            .map_err(|_| {
+                format!(
+                    "failed to reset descriptor pool for frame index {}",
+                    frame_index
+                )
+            })?;
+    }
+
+    Ok(())
+}
+
+fn allocate_descriptor_set(
+    vulkan_data: &mut VulkanData,
+    vulkan_base: &VulkanBase,
+) -> Result<vk::DescriptorSet, String> {
+    let layouts = [vulkan_data.descriptor_set_layout; 1];
+
+    let alloc_info = vk::DescriptorSetAllocateInfo::builder()
+        .descriptor_pool(vulkan_data.descriptor_pools[vulkan_data.frame_index as usize])
+        .set_layouts(&layouts)
+        .build();
+
+    let descriptor_sets = match unsafe { vulkan_base.device.allocate_descriptor_sets(&alloc_info) }
+    {
+        Ok(sets) => sets,
+        Err(_) => return Err(String::from("failed to allocate descriptor sets")),
+    };
+
+    let set = descriptor_sets[0];
+
+    vulkan::set_debug_utils_object_name(
+        &vulkan_base.debug_utils_loader,
+        vulkan_base.device.handle(),
+        set,
+        "descriptor set",
+    );
+
+    Ok(set)
+}
+
+fn update_descriptor_set(
+    vulkan_data: &VulkanData,
+    vulkan_base: &VulkanBase,
+    set: vk::DescriptorSet,
+) {
+    let control_point_buffer_info = vk::DescriptorBufferInfo {
+        buffer: vulkan_data.control_points_mem_buffer.buffer,
+        offset: 0,
+        range: vk::WHOLE_SIZE,
+    };
+
+    let instance_buffer_info = vk::DescriptorBufferInfo {
+        buffer: vulkan_data.instances_mem_buffer.buffer,
+        offset: 0,
+        range: vk::WHOLE_SIZE,
+    };
+
+    let uniform_buffer_info = vk::DescriptorBufferInfo {
+        buffer: vulkan_data.uniform_mem_buffers[vulkan_data.frame_index as usize].buffer,
+        offset: 0,
+        range: vk::WHOLE_SIZE,
+    };
+
+    let infos_1 = [control_point_buffer_info];
+    let write_descriptor_set_1 = vk::WriteDescriptorSet::builder()
+        .dst_set(set)
+        .dst_binding(0)
+        .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+        .buffer_info(&infos_1)
+        .build();
+
+    let infos_2 = [instance_buffer_info];
+    let write_descriptor_set_2 = vk::WriteDescriptorSet::builder()
+        .dst_set(set)
+        .dst_binding(1)
+        .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+        .buffer_info(&infos_2)
+        .build();
+
+    let infos_3 = [uniform_buffer_info];
+    let write_descriptor_set_3 = vk::WriteDescriptorSet::builder()
+        .dst_set(set)
+        .dst_binding(2)
+        .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+        .buffer_info(&infos_3)
+        .build();
+
+    unsafe {
+        vulkan_base.device.update_descriptor_sets(
+            &[
+                write_descriptor_set_1,
+                write_descriptor_set_2,
+                write_descriptor_set_3,
+            ],
+            &[],
+        );
     }
 }
 
@@ -238,7 +368,11 @@ fn present(
     Ok(())
 }
 
-pub fn draw(vulkan_data: &mut VulkanData, vulkan_base: &VulkanBase) -> Result<(), String> {
+pub fn draw(
+    vulkan_data: &mut VulkanData,
+    vulkan_base: &VulkanBase,
+    time_since_biginning_sec: f32,
+) -> Result<(), String> {
     let image_index = get_image_index(vulkan_data, vulkan_base)?;
     wait_resource_available(vulkan_data, vulkan_base)?;
     reset_command_pool(vulkan_data, vulkan_base)?;
@@ -251,6 +385,84 @@ pub fn draw(vulkan_data: &mut VulkanData, vulkan_base: &VulkanBase) -> Result<()
         command_buffer,
     );
     set_viewport(vulkan_base, command_buffer);
+    set_scissor(vulkan_base, command_buffer);
+
+    reset_descriptor_pool(vulkan_data, vulkan_base)?;
+    let descriptor_set = allocate_descriptor_set(vulkan_data, vulkan_base)?;
+    update_descriptor_set(vulkan_data, vulkan_base, descriptor_set);
+
+    let model: Matrix4<f32> = Matrix4::from_translation(Vector3::new(0.0, 1.0, 0.0))
+        * Matrix4::from_angle_x(Deg::<f32>(120.0))
+        * Matrix4::from_angle_z(Deg::<f32>(time_since_biginning_sec * 20.0));
+    let view = Matrix4::look_at_rh(
+        Point3::<f32>::new(0.0, 0.0, -10.0),
+        Point3::<f32>::new(0.0, 0.0, 0.0),
+        Vector3::<f32>::new(0.0, 1.0, 0.0),
+    );
+    let projection = perspective(Deg::<f32>(45.0), 800.0 / 600.0, 0.1, 100.0);
+
+    let mvp = projection * view * model;
+
+    let curr_uniform_buffer = &vulkan_data.uniform_mem_buffers[vulkan_data.frame_index as usize];
+
+    let allocation_info = vulkan_base
+        .allocator
+        .get_allocation_info(&curr_uniform_buffer.allocation)
+        .map_err(|_| String::from("failed to get allocation info for uniform buffer"))?;
+
+    let mvp_data = cgmath::conv::array4(mvp);
+    let mvp_data_bytes = bytemuck::cast_slice(&mvp_data);
+
+    unsafe {
+        std::ptr::copy_nonoverlapping(
+            mvp_data_bytes.as_ptr(),
+            allocation_info.get_mapped_data(),
+            16 * 4,
+        )
+    };
+
+    unsafe {
+        let tesselation_value = 10.0f32;
+
+        vulkan_base.device.cmd_push_constants(
+            command_buffer,
+            vulkan_data.pipeline_layout,
+            vk::ShaderStageFlags::TESSELLATION_CONTROL,
+            0,
+            bytemuck::cast_slice(&[tesselation_value]),
+        );
+
+        vulkan_base.device.cmd_bind_descriptor_sets(
+            command_buffer,
+            vk::PipelineBindPoint::GRAPHICS,
+            vulkan_data.pipeline_layout,
+            0,
+            &[descriptor_set],
+            &[],
+        );
+
+        vulkan_base.device.cmd_bind_pipeline(
+            command_buffer,
+            vk::PipelineBindPoint::GRAPHICS,
+            vulkan_data.solid_pipeline,
+        );
+
+        vulkan_base.device.cmd_bind_index_buffer(
+            command_buffer,
+            vulkan_data.patches_mem_buffer.buffer,
+            0,
+            vk::IndexType::UINT16,
+        );
+
+        vulkan_base.device.cmd_draw_indexed(
+            command_buffer,
+            vulkan_data.patch_point_count,
+            1,
+            0,
+            0,
+            0,
+        );
+    }
 
     unsafe {
         vulkan_base.device.cmd_end_render_pass(command_buffer);

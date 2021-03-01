@@ -15,6 +15,7 @@ winit = "0.24.0"
 vulkan_base = {path = "../vulkan_base"}
 vk-mem = "0.2.2"
 bytemuck = "1.5.0"
+cgmath = "0.18.0"
 
 [build-dependencies]
 shaderc = "0.7.1"

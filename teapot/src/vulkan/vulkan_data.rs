@@ -26,10 +26,11 @@ pub struct VulkanData {
     pub fragment_shader_module: vk::ShaderModule,
     pub control_points_mem_buffer: MemBuffer,
     pub patches_mem_buffer: MemBuffer,
+    pub patch_point_count: u32,
     pub instances_mem_buffer: MemBuffer,
     pub uniform_mem_buffers: Vec<MemBuffer>,
     pub descriptor_set_layout: vk::DescriptorSetLayout,
-    pub descriptor_pool: vk::DescriptorPool,
+    pub descriptor_pools: Vec<vk::DescriptorPool>,
     pub pipeline_layout: vk::PipelineLayout,
     pub render_pass: vk::RenderPass,
     pub solid_pipeline: vk::Pipeline,
@@ -112,9 +113,11 @@ impl VulkanData {
                 .device
                 .destroy_descriptor_set_layout(self.descriptor_set_layout, None);
 
-            vulkan_base
-                .device
-                .destroy_descriptor_pool(self.descriptor_pool, None);
+            for &descriptor_pool in &self.descriptor_pools {
+                vulkan_base
+                    .device
+                    .destroy_descriptor_pool(descriptor_pool, None);
+            }
 
             vulkan_base
                 .device
@@ -200,6 +203,8 @@ fn new_internal(vulkan_data: &mut VulkanData, vulkan_base: &VulkanBase) -> Resul
         "patches buffer",
     )?;
 
+    vulkan_data.patch_point_count = teapot_data.get_patch_point_count();
+
     vulkan_data.instances_mem_buffer = vulkan::create_buffer_init(
         vulkan_base,
         teapot_data.get_instances_slice(),
@@ -213,7 +218,7 @@ fn new_internal(vulkan_data: &mut VulkanData, vulkan_base: &VulkanBase) -> Resul
         let buffer = vulkan::create_buffer(
             vulkan_base,
             (16 * std::mem::size_of::<f32>()) as vk::DeviceSize,
-            vk::BufferUsageFlags::STORAGE_BUFFER,
+            vk::BufferUsageFlags::UNIFORM_BUFFER,
             vk_mem::MemoryUsage::CpuToGpu,
             vk_mem::AllocationCreateFlags::MAPPED,
             &format!("uniform buffer {}", i),
@@ -223,7 +228,7 @@ fn new_internal(vulkan_data: &mut VulkanData, vulkan_base: &VulkanBase) -> Resul
     }
 
     vulkan_data.descriptor_set_layout = create_descriptor_set_layout(vulkan_base)?;
-    vulkan_data.descriptor_pool = create_descriptor_pool(vulkan_base)?;
+    vulkan_data.descriptor_pools = create_descriptor_pools(vulkan_base)?;
     vulkan_data.pipeline_layout =
         create_pipeline_layout(vulkan_base, vulkan_data.descriptor_set_layout)?;
     vulkan_data.render_pass = create_render_pass(vulkan_base)?;
@@ -319,7 +324,7 @@ fn create_descriptor_set_layout(
     Ok(descriptor_set_layout)
 }
 
-fn create_descriptor_pool(vulkan_base: &VulkanBase) -> Result<vk::DescriptorPool, String> {
+fn create_descriptor_pools(vulkan_base: &VulkanBase) -> Result<Vec<vk::DescriptorPool>, String> {
     let pool_size_1 = vk::DescriptorPoolSize {
         ty: vk::DescriptorType::STORAGE_BUFFER,
         descriptor_count: 100,
@@ -336,21 +341,32 @@ fn create_descriptor_pool(vulkan_base: &VulkanBase) -> Result<vk::DescriptorPool
         .pool_sizes(&sizes)
         .build();
 
-    let descriptor_pool = unsafe {
-        vulkan_base
-            .device
-            .create_descriptor_pool(&create_info, None)
-            .map_err(|_| String::from("failed to create descriptor pool"))?
-    };
+    let mut descriptor_pools = Vec::with_capacity(crate::CONCURRENT_FRAME_COUNT as usize);
 
-    vulkan::set_debug_utils_object_name(
-        &vulkan_base.debug_utils_loader,
-        vulkan_base.device.handle(),
-        descriptor_pool,
-        "descriptor pool",
-    );
+    for i in 0..crate::CONCURRENT_FRAME_COUNT {
+        let pool = unsafe {
+            vulkan_base
+                .device
+                .create_descriptor_pool(&create_info, None)
+                .map_err(|_| {
+                    for &p in &descriptor_pools {
+                        vulkan_base.device.destroy_descriptor_pool(p, None);
+                    }
+                    format!("failed to create descriptor pool {}", i)
+                })?
+        };
 
-    Ok(descriptor_pool)
+        vulkan::set_debug_utils_object_name(
+            &vulkan_base.debug_utils_loader,
+            vulkan_base.device.handle(),
+            pool,
+            &format!("descriptor pool {}", i),
+        );
+
+        descriptor_pools.push(pool);
+    }
+
+    Ok(descriptor_pools)
 }
 
 fn create_pipeline_layout(
@@ -488,6 +504,12 @@ fn create_pipelines(
 
     let col_blend_attachment_state = vk::PipelineColorBlendAttachmentState::builder()
         .blend_enable(false)
+        .color_write_mask(
+            vk::ColorComponentFlags::R
+                | vk::ColorComponentFlags::G
+                | vk::ColorComponentFlags::B
+                | vk::ColorComponentFlags::A,
+        )
         .build();
 
     let attachments = [col_blend_attachment_state];

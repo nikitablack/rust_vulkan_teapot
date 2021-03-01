@@ -63,6 +63,7 @@ fn main() {
     // loop
     let mut app_exit = false;
     let mut window_resized = false;
+    let start_time = std::time::Instant::now();
 
     event_loop.run(move |event, _, control_flow| {
         use winit::event::Event;
@@ -114,7 +115,11 @@ fn main() {
                     }
                 }
 
-                if let Err(msg) = vulkan::draw(&mut vk_data, &vk_base) {
+                if let Err(msg) = vulkan::draw(
+                    &mut vk_data,
+                    &vk_base,
+                    (std::time::Instant::now() - start_time).as_secs_f32(),
+                ) {
                     panic!(msg);
                 }
 
