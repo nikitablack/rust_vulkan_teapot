@@ -214,7 +214,7 @@ fn new_internal(vulkan_data: &mut VulkanData, vulkan_base: &VulkanBase) -> Resul
         "instances buffer",
     )?;
 
-    for i in 0..crate::CONCURRENT_FRAME_COUNT {
+    for i in 0..crate::CONCURRENT_RESOURCE_COUNT {
         let buffer = vulkan::create_buffer(
             vulkan_base,
             (16 * std::mem::size_of::<f32>()) as vk::DeviceSize,
