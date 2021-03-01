@@ -25,7 +25,7 @@ fn wait_resource_available(
     vulkan_data: &VulkanData,
     vulkan_base: &VulkanBase,
 ) -> Result<(), String> {
-    let fence = vulkan_data.fences[vulkan_data.frame_index as usize];
+    let fence = vulkan_data.fences[vulkan_data.curr_resource_index as usize];
 
     unsafe {
         vulkan_base
@@ -34,14 +34,16 @@ fn wait_resource_available(
             .map_err(|_| {
                 format!(
                     "failed to wait for resource fence {}",
-                    vulkan_data.frame_index
+                    vulkan_data.curr_resource_index
                 )
             })?;
 
-        vulkan_base
-            .device
-            .reset_fences(&[fence])
-            .map_err(|_| format!("failed to reset resource fence {}", vulkan_data.frame_index))?;
+        vulkan_base.device.reset_fences(&[fence]).map_err(|_| {
+            format!(
+                "failed to reset resource fence {}",
+                vulkan_data.curr_resource_index
+            )
+        })?;
     }
 
     Ok(())
@@ -51,14 +53,14 @@ fn reset_command_pool(
     vulkan_data: &mut VulkanData,
     vulkan_base: &VulkanBase,
 ) -> Result<(), String> {
-    let command_pool = vulkan_data.command_pools[vulkan_data.frame_index as usize];
+    let command_pool = vulkan_data.command_pools[vulkan_data.curr_resource_index as usize];
     let available_command_buffers =
-        &mut vulkan_data.available_command_buffers[vulkan_data.frame_index as usize];
+        &mut vulkan_data.available_command_buffers[vulkan_data.curr_resource_index as usize];
     let used_command_buffers =
-        &mut vulkan_data.used_command_buffers[vulkan_data.frame_index as usize];
+        &mut vulkan_data.used_command_buffers[vulkan_data.curr_resource_index as usize];
 
     unsafe {
-        let frame_index = vulkan_data.frame_index;
+        let curr_resource_index = vulkan_data.curr_resource_index;
 
         vulkan_base
             .device
@@ -66,7 +68,7 @@ fn reset_command_pool(
             .map_err(|_| {
                 format!(
                     "failed to reset command pool for frame index {}",
-                    frame_index
+                    curr_resource_index
                 )
             })?;
 
@@ -80,9 +82,9 @@ fn get_command_buffer(
     vulkan_data: &mut VulkanData,
     vulkan_base: &VulkanBase,
 ) -> Result<vk::CommandBuffer, String> {
-    let command_pool = vulkan_data.command_pools[vulkan_data.frame_index as usize];
+    let command_pool = vulkan_data.command_pools[vulkan_data.curr_resource_index as usize];
     let available_command_buffers =
-        &mut vulkan_data.available_command_buffers[vulkan_data.frame_index as usize];
+        &mut vulkan_data.available_command_buffers[vulkan_data.curr_resource_index as usize];
 
     if available_command_buffers.is_empty() {
         unsafe {
@@ -92,7 +94,7 @@ fn get_command_buffer(
                 .command_buffer_count(10)
                 .build();
 
-            let frame_index = vulkan_data.frame_index;
+            let curr_resource_index = vulkan_data.curr_resource_index;
 
             let mut command_buffers = vulkan_base
                 .device
@@ -100,7 +102,7 @@ fn get_command_buffer(
                 .map_err(|_| {
                     format!(
                         "failed to allocate command buffers for frame index {}",
-                        frame_index
+                        curr_resource_index
                     )
                 })?;
 
@@ -111,7 +113,7 @@ fn get_command_buffer(
     let command_buffer = available_command_buffers.pop().unwrap();
 
     let used_command_buffers =
-        &mut vulkan_data.used_command_buffers[vulkan_data.frame_index as usize];
+        &mut vulkan_data.used_command_buffers[vulkan_data.curr_resource_index as usize];
 
     used_command_buffers.push(command_buffer);
 
@@ -203,10 +205,10 @@ fn reset_descriptor_pool(
     vulkan_data: &mut VulkanData,
     vulkan_base: &VulkanBase,
 ) -> Result<(), String> {
-    let descriptor_pool = vulkan_data.descriptor_pools[vulkan_data.frame_index as usize];
+    let descriptor_pool = vulkan_data.descriptor_pools[vulkan_data.curr_resource_index as usize];
 
     unsafe {
-        let frame_index = vulkan_data.frame_index;
+        let curr_resource_index = vulkan_data.curr_resource_index;
 
         vulkan_base
             .device
@@ -214,7 +216,7 @@ fn reset_descriptor_pool(
             .map_err(|_| {
                 format!(
                     "failed to reset descriptor pool for frame index {}",
-                    frame_index
+                    curr_resource_index
                 )
             })?;
     }
@@ -229,7 +231,7 @@ fn allocate_descriptor_set(
     let layouts = [vulkan_data.descriptor_set_layout; 1];
 
     let alloc_info = vk::DescriptorSetAllocateInfo::builder()
-        .descriptor_pool(vulkan_data.descriptor_pools[vulkan_data.frame_index as usize])
+        .descriptor_pool(vulkan_data.descriptor_pools[vulkan_data.curr_resource_index as usize])
         .set_layouts(&layouts)
         .build();
 
@@ -269,7 +271,7 @@ fn update_descriptor_set(
     };
 
     let uniform_buffer_info = vk::DescriptorBufferInfo {
-        buffer: vulkan_data.uniform_mem_buffers[vulkan_data.frame_index as usize].buffer,
+        buffer: vulkan_data.uniform_mem_buffers[vulkan_data.curr_resource_index as usize].buffer,
         offset: 0,
         range: vk::WHOLE_SIZE,
     };
@@ -315,7 +317,7 @@ fn submit(
     vulkan_base: &VulkanBase,
     command_buffer: vk::CommandBuffer,
 ) -> Result<(), String> {
-    let fence = vulkan_data.fences[vulkan_data.frame_index as usize];
+    let fence = vulkan_data.fences[vulkan_data.curr_resource_index as usize];
 
     let wait_semaphores = [vulkan_data.image_available_semaphore];
     let masks = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
@@ -403,7 +405,8 @@ pub fn draw(
 
     let mvp = projection * view * model;
 
-    let curr_uniform_buffer = &vulkan_data.uniform_mem_buffers[vulkan_data.frame_index as usize];
+    let curr_uniform_buffer =
+        &vulkan_data.uniform_mem_buffers[vulkan_data.curr_resource_index as usize];
 
     let allocation_info = vulkan_base
         .allocator

@@ -43,7 +43,7 @@ pub struct VulkanData {
 
     pub available_command_buffers: Vec<Vec<vk::CommandBuffer>>,
     pub used_command_buffers: Vec<Vec<vk::CommandBuffer>>,
-    pub frame_index: u32,
+    pub curr_resource_index: u32,
 }
 
 impl VulkanData {

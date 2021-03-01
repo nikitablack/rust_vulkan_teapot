@@ -123,7 +123,8 @@ fn main() {
                     panic!(msg);
                 }
 
-                vk_data.frame_index = (vk_data.frame_index + 1) % CONCURRENT_FRAME_COUNT;
+                vk_data.curr_resource_index =
+                    (vk_data.curr_resource_index + 1) % CONCURRENT_RESOURCE_COUNT;
             }
 
             Event::WindowEvent {
