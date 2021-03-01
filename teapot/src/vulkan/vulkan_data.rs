@@ -255,8 +255,8 @@ fn new_internal(vulkan_data: &mut VulkanData, vulkan_base: &VulkanBase) -> Resul
 
     vulkan_data.fences = create_fences(vulkan_base)?;
     vulkan_data.command_pools = create_command_pools(vulkan_base)?;
-    vulkan_data.available_command_buffers = vec![vec![]; crate::CONCURRENT_FRAME_COUNT as usize];
-    vulkan_data.used_command_buffers = vec![vec![]; crate::CONCURRENT_FRAME_COUNT as usize];
+    vulkan_data.available_command_buffers = vec![vec![]; crate::CONCURRENT_RESOURCE_COUNT as usize];
+    vulkan_data.used_command_buffers = vec![vec![]; crate::CONCURRENT_RESOURCE_COUNT as usize];
 
     Ok(())
 }
@@ -341,9 +341,9 @@ fn create_descriptor_pools(vulkan_base: &VulkanBase) -> Result<Vec<vk::Descripto
         .pool_sizes(&sizes)
         .build();
 
-    let mut descriptor_pools = Vec::with_capacity(crate::CONCURRENT_FRAME_COUNT as usize);
+    let mut descriptor_pools = Vec::with_capacity(crate::CONCURRENT_RESOURCE_COUNT as usize);
 
-    for i in 0..crate::CONCURRENT_FRAME_COUNT {
+    for i in 0..crate::CONCURRENT_RESOURCE_COUNT {
         let pool = unsafe {
             vulkan_base
                 .device
@@ -672,9 +672,9 @@ fn create_fences(vulkan_base: &VulkanBase) -> Result<Vec<vk::Fence>, String> {
         .flags(vk::FenceCreateFlags::SIGNALED)
         .build();
 
-    let mut fences = Vec::with_capacity(crate::CONCURRENT_FRAME_COUNT as usize);
+    let mut fences = Vec::with_capacity(crate::CONCURRENT_RESOURCE_COUNT as usize);
 
-    for i in 0..crate::CONCURRENT_FRAME_COUNT {
+    for i in 0..crate::CONCURRENT_RESOURCE_COUNT {
         let fence = unsafe {
             vulkan_base
                 .device
@@ -706,9 +706,9 @@ fn create_command_pools(vulkan_base: &VulkanBase) -> Result<Vec<vk::CommandPool>
         .flags(vk::CommandPoolCreateFlags::TRANSIENT)
         .queue_family_index(vulkan_base.queue_family);
 
-    let mut command_pools = Vec::with_capacity(crate::CONCURRENT_FRAME_COUNT as usize);
+    let mut command_pools = Vec::with_capacity(crate::CONCURRENT_RESOURCE_COUNT as usize);
 
-    for i in 0..crate::CONCURRENT_FRAME_COUNT {
+    for i in 0..crate::CONCURRENT_RESOURCE_COUNT {
         let command_pool = unsafe {
             vulkan_base
                 .device
