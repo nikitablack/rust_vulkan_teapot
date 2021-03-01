@@ -44,6 +44,8 @@ pub struct VulkanData {
     pub available_command_buffers: Vec<Vec<vk::CommandBuffer>>,
     pub used_command_buffers: Vec<Vec<vk::CommandBuffer>>,
     pub curr_resource_index: u32,
+    pub is_wireframe_mode: bool,
+    pub tesselation_level: f32,
 }
 
 impl VulkanData {
@@ -257,6 +259,7 @@ fn new_internal(vulkan_data: &mut VulkanData, vulkan_base: &VulkanBase) -> Resul
     vulkan_data.command_pools = create_command_pools(vulkan_base)?;
     vulkan_data.available_command_buffers = vec![vec![]; crate::CONCURRENT_RESOURCE_COUNT as usize];
     vulkan_data.used_command_buffers = vec![vec![]; crate::CONCURRENT_RESOURCE_COUNT as usize];
+    vulkan_data.tesselation_level = 1.0;
 
     Ok(())
 }

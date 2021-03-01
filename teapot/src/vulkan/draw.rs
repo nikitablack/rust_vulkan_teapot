@@ -439,14 +439,12 @@ pub fn draw(
     };
 
     unsafe {
-        let tesselation_value = 10.0f32;
-
         vulkan_base.device.cmd_push_constants(
             command_buffer,
             vulkan_data.pipeline_layout,
             vk::ShaderStageFlags::TESSELLATION_CONTROL,
             0,
-            bytemuck::cast_slice(&[tesselation_value]),
+            bytemuck::cast_slice(&[vulkan_data.tesselation_level]),
         );
 
         vulkan_base.device.cmd_bind_descriptor_sets(
@@ -458,10 +456,15 @@ pub fn draw(
             &[],
         );
 
+        let curr_pipeline = match vulkan_data.is_wireframe_mode {
+            true => vulkan_data.wireframe_pipeline,
+            false => vulkan_data.solid_pipeline,
+        };
+
         vulkan_base.device.cmd_bind_pipeline(
             command_buffer,
             vk::PipelineBindPoint::GRAPHICS,
-            vulkan_data.solid_pipeline,
+            curr_pipeline,
         );
 
         vulkan_base.device.cmd_bind_index_buffer(

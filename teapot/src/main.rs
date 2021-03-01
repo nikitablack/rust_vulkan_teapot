@@ -66,7 +66,10 @@ fn main() {
     let start_time = std::time::Instant::now();
 
     event_loop.run(move |event, _, control_flow| {
+        use winit::event::ElementState;
         use winit::event::Event;
+        use winit::event::KeyboardInput;
+        use winit::event::VirtualKeyCode;
         use winit::event::WindowEvent;
         use winit::event_loop::ControlFlow;
 
@@ -134,6 +137,33 @@ fn main() {
                 window_resized = true;
                 log::info!("resize requested {:?}", physical_size);
             }
+
+            Event::WindowEvent {
+                event:
+                    WindowEvent::KeyboardInput {
+                        input:
+                            KeyboardInput {
+                                virtual_keycode: Some(virtual_code),
+                                state: ElementState::Pressed,
+                                ..
+                            },
+                        ..
+                    },
+                ..
+            } => match virtual_code {
+                VirtualKeyCode::Space => {
+                    vk_data.is_wireframe_mode = !vk_data.is_wireframe_mode;
+                }
+                VirtualKeyCode::Plus | VirtualKeyCode::NumpadAdd => {
+                    vk_data.tesselation_level += 0.1f32;
+                    vk_data.tesselation_level = vk_data.tesselation_level.min(64.0);
+                }
+                VirtualKeyCode::Minus | VirtualKeyCode::NumpadSubtract => {
+                    vk_data.tesselation_level -= 0.1f32;
+                    vk_data.tesselation_level = vk_data.tesselation_level.max(1.0);
+                }
+                _ => (),
+            },
 
             _ => {}
         }
