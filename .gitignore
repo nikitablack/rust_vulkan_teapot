@@ -2,3 +2,4 @@
 log.txt
 Cargo.lock
 *.spv
+launch.json

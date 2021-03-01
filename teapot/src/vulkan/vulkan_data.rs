@@ -26,6 +26,7 @@ pub struct VulkanData {
     pub fragment_shader_module: vk::ShaderModule,
     pub control_points_mem_buffer: MemBuffer,
     pub patches_mem_buffer: MemBuffer,
+    pub patch_point_count: u32,
     pub instances_mem_buffer: MemBuffer,
     pub uniform_mem_buffers: Vec<MemBuffer>,
     pub descriptor_set_layout: vk::DescriptorSetLayout,
@@ -176,6 +177,8 @@ fn new_internal(vulkan_data: &mut VulkanData, vulkan_base: &VulkanBase) -> Resul
         "patches buffer",
     )?;
 
+    vulkan_data.patch_point_count = teapot_data.get_patch_point_count();
+
     vulkan_data.instances_mem_buffer = vulkan::create_buffer_init(
         vulkan_base,
         teapot_data.get_instances_slice(),
@@ -185,11 +188,11 @@ fn new_internal(vulkan_data: &mut VulkanData, vulkan_base: &VulkanBase) -> Resul
         "instances buffer",
     )?;
 
-    for i in 0..crate::CONCURRENT_FRAME_COUNT {
+    for i in 0..crate::CONCURRENT_RESOURCE_COUNT {
         let buffer = vulkan::create_buffer(
             vulkan_base,
             (16 * std::mem::size_of::<f32>()) as vk::DeviceSize,
-            vk::BufferUsageFlags::STORAGE_BUFFER,
+            vk::BufferUsageFlags::UNIFORM_BUFFER,
             vk_mem::MemoryUsage::CpuToGpu,
             vk_mem::AllocationCreateFlags::MAPPED,
             &format!("uniform buffer {}", i),
