@@ -8,14 +8,14 @@ struct PatchData
     vec4 color;
 };
 
-layout(set = 0, binding = 1, row_major) readonly buffer StorageBuffer
+layout(set = 0, binding = 1) readonly buffer StorageBuffer
 {
     PatchData patchData[];
 };
 
 layout(set = 0, binding = 2) uniform UniformBuffer
 {
-    layout(row_major) mat4 mvpMatrix;
+    mat4 mvpMatrix;
 };
 
 layout (location = 0) out vec3 outColor;
@@ -50,7 +50,7 @@ void main(void)
 
     vec4 localPos = evaluateBezier(basisU, basisV);
 
-    gl_Position = localPos * patchData[gl_PrimitiveID].transform * mvpMatrix;
+    gl_Position = mvpMatrix * patchData[gl_PrimitiveID].transform * localPos;
 
     outColor = patchData[gl_PrimitiveID].color.xyz;
 }
