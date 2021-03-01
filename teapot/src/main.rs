@@ -5,7 +5,7 @@ use ash::version::DeviceV1_0;
 use vulkan::VulkanData;
 use vulkan_base::VulkanBase;
 
-const CONCURRENT_FRAME_COUNT: u32 = 2;
+const CONCURRENT_RESOURCE_COUNT: u32 = 2;
 
 fn main() {
     // logger
