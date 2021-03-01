@@ -7,7 +7,7 @@ use vulkan_base::VulkanBase;
 fn main() {
     // logger
     let mut loggers: Vec<Box<dyn simplelog::SharedLogger>> = vec![simplelog::TermLogger::new(
-        simplelog::LevelFilter::Trace,
+        simplelog::LevelFilter::Info,
         simplelog::Config::default(),
         simplelog::TerminalMode::Mixed,
     )];
@@ -107,11 +107,11 @@ fn main() {
             }
 
             Event::WindowEvent {
-                event: WindowEvent::Resized { .. },
+                event: WindowEvent::Resized(physical_size),
                 ..
             } => {
                 window_resized = true;
-                log::info!("resize requested");
+                log::info!("resize requested {:?}", physical_size);
             }
 
             _ => {}
