@@ -36,11 +36,11 @@ pub struct VulkanData {
     pub solid_pipeline: vk::Pipeline,
     pub wireframe_pipeline: vk::Pipeline,
     pub framebuffers: Vec<vk::Framebuffer>,
+    pub should_resize: bool,
     pub image_available_semaphore: vk::Semaphore,
     pub rendering_finished_semaphore: vk::Semaphore,
     pub fences: Vec<vk::Fence>,
     pub command_pools: Vec<vk::CommandPool>,
-
     pub available_command_buffers: Vec<Vec<vk::CommandBuffer>>,
     pub used_command_buffers: Vec<Vec<vk::CommandBuffer>>,
     pub curr_resource_index: u32,
