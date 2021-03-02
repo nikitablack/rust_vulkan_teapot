@@ -1,10 +1,12 @@
+use crate::vulkan;
 use ash::version::DeviceV1_0;
 use ash::vk;
 use std::io::Read;
 
 pub fn create_shader_module(
-    device: &ash::Device,
+    vulkan_base: &vulkan_base::VulkanBase,
     path: &std::path::Path,
+    object_name: &str,
 ) -> Result<vk::ShaderModule, String> {
     let mut file = match std::fs::File::open(path) {
         Ok(f) => f,
@@ -25,10 +27,18 @@ pub fn create_shader_module(
         .code(&spirv_u32)
         .build();
 
-    let shader_module = match unsafe { device.create_shader_module(&create_info, None) } {
+    let shader_module = match unsafe { vulkan_base.device.create_shader_module(&create_info, None) }
+    {
         Ok(module) => module,
         Err(_) => return Err(format!("failed to create shader module {:?}", path)),
     };
+
+    vulkan::set_debug_utils_object_name(
+        &vulkan_base.debug_utils_loader,
+        vulkan_base.device.handle(),
+        shader_module,
+        object_name,
+    );
 
     Ok(shader_module)
 }
