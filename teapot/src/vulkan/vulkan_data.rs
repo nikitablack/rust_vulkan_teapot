@@ -36,6 +36,7 @@ pub struct VulkanData {
     pub solid_pipeline: vk::Pipeline,
     pub wireframe_pipeline: vk::Pipeline,
     pub framebuffers: Vec<vk::Framebuffer>,
+    pub should_resize: bool,
 }
 
 impl VulkanData {
