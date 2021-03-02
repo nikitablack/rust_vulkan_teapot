@@ -58,7 +58,7 @@ impl VulkanData {
         }
 
         self.framebuffers =
-            create_framebuffers(vulkan_base, self.render_pass, vulkan_base.surface_extent)?;
+            vulkan::create_framebuffers(vulkan_base, self.render_pass, vulkan_base.surface_extent)?;
 
         Ok(())
     }
@@ -219,54 +219,11 @@ fn new_internal(vulkan_data: &mut VulkanData, vulkan_base: &VulkanBase) -> Resul
     )?;
     vulkan_data.solid_pipeline = solid_pipeline;
     vulkan_data.wireframe_pipeline = wireframe_pipeline;
-    vulkan_data.framebuffers = create_framebuffers(
+    vulkan_data.framebuffers = vulkan::create_framebuffers(
         vulkan_base,
         vulkan_data.render_pass,
         vulkan_base.surface_extent,
     )?;
 
     Ok(())
-}
-
-fn create_framebuffers(
-    vulkan_base: &VulkanBase,
-    render_pass: vk::RenderPass,
-    framebuffer_extent: vk::Extent2D,
-) -> Result<Vec<vk::Framebuffer>, String> {
-    let mut framebuffers = Vec::with_capacity(vulkan_base.swapchain_image_views.len());
-
-    for (i, &view) in vulkan_base.swapchain_image_views.iter().enumerate() {
-        let attachments = [view];
-
-        let create_info = vk::FramebufferCreateInfo::builder()
-            .render_pass(render_pass)
-            .attachments(&attachments)
-            .width(framebuffer_extent.width)
-            .height(framebuffer_extent.height)
-            .layers(1)
-            .build();
-
-        let framebuffer = unsafe {
-            vulkan_base
-                .device
-                .create_framebuffer(&create_info, None)
-                .map_err(|_| {
-                    for &fb in &framebuffers {
-                        vulkan_base.device.destroy_framebuffer(fb, None);
-                    }
-                    format!("failed to create framebuffer {}", i)
-                })?
-        };
-
-        framebuffers.push(framebuffer);
-
-        vulkan::set_debug_utils_object_name(
-            &vulkan_base.debug_utils_loader,
-            vulkan_base.device.handle(),
-            framebuffer,
-            &format!("framebuffer {}", i),
-        );
-    }
-
-    Ok(framebuffers)
 }

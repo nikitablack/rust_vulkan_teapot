@@ -1,6 +1,7 @@
 mod create_buffer;
 mod create_descriptor_pools;
 mod create_descriptor_set_layout;
+mod create_framebuffers;
 mod create_pipeline_layout;
 mod create_pipelines;
 mod create_render_pass;
@@ -12,6 +13,7 @@ mod vulkan_data;
 pub use create_buffer::*;
 pub use create_descriptor_pools::*;
 pub use create_descriptor_set_layout::*;
+pub use create_framebuffers::*;
 pub use create_pipeline_layout::*;
 pub use create_pipelines::*;
 pub use create_render_pass::*;
