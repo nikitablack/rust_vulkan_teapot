@@ -43,46 +43,29 @@ impl VulkanData {
 }
 
 fn new_internal(vulkan_data: &mut VulkanData, vulkan_base: &VulkanBase) -> Result<(), String> {
-    vulkan_data.vertex_shader_module = create_shader_module(
+    vulkan_data.vertex_shader_module = vulkan::create_shader_module(
         vulkan_base,
         std::path::Path::new("shaders/shader.vert.spv"),
         "vertex shader",
     )?;
 
-    vulkan_data.tese_shader_module = create_shader_module(
+    vulkan_data.tese_shader_module = vulkan::create_shader_module(
         vulkan_base,
         std::path::Path::new("shaders/shader.tese.spv"),
         "tesselation evaluation shader",
     )?;
 
-    vulkan_data.tesc_shader_module = create_shader_module(
+    vulkan_data.tesc_shader_module = vulkan::create_shader_module(
         vulkan_base,
         std::path::Path::new("shaders/shader.tesc.spv"),
         "tesselation control shader",
     )?;
 
-    vulkan_data.fragment_shader_module = create_shader_module(
+    vulkan_data.fragment_shader_module = vulkan::create_shader_module(
         vulkan_base,
         std::path::Path::new("shaders/shader.frag.spv"),
         "fragment shader",
     )?;
 
     Ok(())
-}
-
-fn create_shader_module(
-    vulkan_base: &VulkanBase,
-    path: &std::path::Path,
-    object_name: &str,
-) -> Result<vk::ShaderModule, String> {
-    let shader_module = vulkan::create_shader_module(&vulkan_base.device, &path)?;
-
-    vulkan::set_debug_utils_object_name(
-        &vulkan_base.debug_utils_loader,
-        vulkan_base.device.handle(),
-        shader_module,
-        object_name,
-    );
-
-    Ok(shader_module)
 }
