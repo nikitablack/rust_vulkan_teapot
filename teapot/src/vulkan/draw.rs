@@ -5,20 +5,35 @@ use ash::vk;
 use cgmath::{num_traits::ToPrimitive, perspective, Deg, Matrix4, Point3, Vector3};
 use vulkan_base::VulkanBase;
 
-fn get_image_index(vulkan_data: &VulkanData, vulkan_base: &VulkanBase) -> Result<u32, String> {
-    let (index, _) = unsafe {
-        vulkan_base
-            .swapchain_loader
-            .acquire_next_image(
-                vulkan_base.swapchain,
-                u64::MAX,
-                vulkan_data.image_available_semaphore,
-                vk::Fence::null(),
-            )
-            .map_err(|_| String::from("failed to acquire next image"))?
+enum GetImageIndexResult {
+    Index(u32),
+    ShouldRebuildSwapchain,
+}
+
+fn get_image_index(
+    vulkan_data: &VulkanData,
+    vulkan_base: &VulkanBase,
+) -> Result<GetImageIndexResult, String> {
+    let (index, is_suboptimal) = match unsafe {
+        vulkan_base.swapchain_loader.acquire_next_image(
+            vulkan_base.swapchain,
+            u64::MAX,
+            vulkan_data.image_available_semaphore,
+            vk::Fence::null(),
+        )
+    } {
+        Ok((index, is_suboptimal)) => (index, is_suboptimal),
+        Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+            return Ok(GetImageIndexResult::ShouldRebuildSwapchain)
+        }
+        Err(_) => return Err(String::from("failed to acquire next image")),
     };
 
-    Ok(index)
+    if is_suboptimal {
+        return Ok(GetImageIndexResult::ShouldRebuildSwapchain);
+    }
+
+    Ok(GetImageIndexResult::Index(index))
 }
 
 fn wait_resource_available(
@@ -344,7 +359,7 @@ fn present(
     vulkan_data: &VulkanData,
     vulkan_base: &VulkanBase,
     image_index: u32,
-) -> Result<(), String> {
+) -> Result<bool, String> {
     let semaphores = [vulkan_data.rendering_finished_semaphore];
     let swapchains = [vulkan_base.swapchain];
     let indices = [image_index];
@@ -360,14 +375,14 @@ fn present(
             .queue_present(vulkan_base.queue, &present_info)
         {
             if err == vk::Result::SUBOPTIMAL_KHR || err == vk::Result::ERROR_OUT_OF_DATE_KHR {
-                println!("swapchain is suboptimal or out of date");
+                return Ok(false);
             } else {
                 return Err(String::from("failed to present"));
             }
         }
     }
 
-    Ok(())
+    Ok(true)
 }
 
 pub fn draw(
@@ -375,7 +390,15 @@ pub fn draw(
     vulkan_base: &VulkanBase,
     time_since_biginning_sec: f32,
 ) -> Result<(), String> {
-    let image_index = get_image_index(vulkan_data, vulkan_base)?;
+    let get_image_index_result = get_image_index(vulkan_data, vulkan_base)?;
+    let image_index = match get_image_index_result {
+        GetImageIndexResult::Index(index) => index,
+        GetImageIndexResult::ShouldRebuildSwapchain => {
+            println!("swapchain is suboptimal or out of date");
+            vulkan_data.should_resize = true;
+            return Ok(());
+        }
+    };
     wait_resource_available(vulkan_data, vulkan_base)?;
     reset_command_pool(vulkan_data, vulkan_base)?;
     let command_buffer = get_command_buffer(vulkan_data, vulkan_base)?;
@@ -494,7 +517,11 @@ pub fn draw(
     }
 
     submit(vulkan_data, vulkan_base, command_buffer)?;
-    present(vulkan_data, vulkan_base, image_index)?;
+    if !present(vulkan_data, vulkan_base, image_index)? {
+        println!("swapchain is suboptimal or out of date");
+        vulkan_data.should_resize = true;
+        return Ok(());
+    }
 
     Ok(())
 }
