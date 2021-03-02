@@ -76,6 +76,8 @@ fn main() {
             } => {
                 *control_flow = ControlFlow::Exit;
 
+                log::info!("exit requested");
+
                 unsafe {
                     let _ = vk_base.device.device_wait_idle();
                 }
@@ -84,8 +86,6 @@ fn main() {
                 vk_base.clean();
 
                 app_exit = true;
-
-                log::info!("exit requested");
             }
 
             Event::MainEventsCleared => {
