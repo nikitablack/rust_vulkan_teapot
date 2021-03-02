@@ -63,7 +63,6 @@ fn main() {
 
     // loop
     let mut app_exit = false;
-    let mut window_resized = false;
 
     event_loop.run(move |event, _, control_flow| {
         use winit::event::Event;
@@ -101,8 +100,8 @@ fn main() {
                     return;
                 }
 
-                if window_resized {
-                    window_resized = false;
+                if vk_data.should_resize {
+                    vk_data.should_resize = false;
 
                     log::info!("handling resize");
 
@@ -122,8 +121,8 @@ fn main() {
                 event: WindowEvent::Resized(physical_size),
                 ..
             } => {
-                window_resized = true;
                 log::info!("resize requested {:?}", physical_size);
+                vk_data.should_resize = true;
             }
 
             _ => {}
