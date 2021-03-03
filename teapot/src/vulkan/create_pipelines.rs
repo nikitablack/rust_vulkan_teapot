@@ -92,6 +92,12 @@ pub fn create_pipelines(
 
     let vert_inp_state = vk::PipelineVertexInputStateCreateInfo::builder().build();
 
+    let depth_stencil_state = vk::PipelineDepthStencilStateCreateInfo::builder()
+        .depth_test_enable(true)
+        .depth_write_enable(true)
+        .depth_compare_op(vk::CompareOp::LESS_OR_EQUAL)
+        .build();
+
     let solid_pipeline_create_info = vk::GraphicsPipelineCreateInfo::builder()
         .flags(vk::PipelineCreateFlags::ALLOW_DERIVATIVES)
         .stages(&stages)
@@ -106,6 +112,7 @@ pub fn create_pipelines(
         .multisample_state(&multisample_state)
         .tessellation_state(&tessellation_state)
         .vertex_input_state(&vert_inp_state)
+        .depth_stencil_state(&depth_stencil_state)
         .build();
 
     let raster_state = vk::PipelineRasterizationStateCreateInfo::builder()

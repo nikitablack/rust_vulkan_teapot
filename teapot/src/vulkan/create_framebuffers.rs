@@ -6,11 +6,12 @@ pub fn create_framebuffers(
     vulkan_base: &vulkan_base::VulkanBase,
     render_pass: vk::RenderPass,
     framebuffer_extent: vk::Extent2D,
+    depth_buffer_view: vk::ImageView,
 ) -> Result<Vec<vk::Framebuffer>, String> {
     let mut framebuffers = Vec::with_capacity(vulkan_base.swapchain_image_views.len());
 
     for (i, &view) in vulkan_base.swapchain_image_views.iter().enumerate() {
-        let attachments = [view];
+        let attachments = [view, depth_buffer_view];
 
         let create_info = vk::FramebufferCreateInfo::builder()
             .render_pass(render_pass)

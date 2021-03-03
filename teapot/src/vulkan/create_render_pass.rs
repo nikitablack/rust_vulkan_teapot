@@ -18,9 +18,27 @@ pub fn create_render_pass(vulkan_base: &vulkan_base::VulkanBase) -> Result<vk::R
             .build(),
     );
 
+    attachment_descriptions.push(
+        vk::AttachmentDescription::builder()
+            .format(vulkan_base.depth_format)
+            .samples(vk::SampleCountFlags::TYPE_1)
+            .load_op(vk::AttachmentLoadOp::CLEAR)
+            .store_op(vk::AttachmentStoreOp::DONT_CARE)
+            .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+            .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+            .initial_layout(vk::ImageLayout::UNDEFINED)
+            .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+            .build(),
+    );
+
     let col_attachment_ref = vk::AttachmentReference::builder()
         .attachment(0)
         .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+        .build();
+
+    let depth_attachment_ref = vk::AttachmentReference::builder()
+        .attachment(1)
+        .layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
         .build();
 
     let references = [col_attachment_ref];
@@ -31,6 +49,7 @@ pub fn create_render_pass(vulkan_base: &vulkan_base::VulkanBase) -> Result<vk::R
         vk::SubpassDescription::builder()
             .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
             .color_attachments(&references)
+            .depth_stencil_attachment(&depth_attachment_ref)
             .build(),
     );
 

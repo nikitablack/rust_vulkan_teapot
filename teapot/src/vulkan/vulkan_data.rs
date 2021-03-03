@@ -18,6 +18,28 @@ impl Default for MemBuffer {
     }
 }
 
+pub struct MemImage {
+    pub image: vk::Image,
+    pub view: vk::ImageView,
+    pub extent: vk::Extent3D,
+    pub allocation: vk_mem::Allocation,
+}
+
+impl Default for MemImage {
+    fn default() -> Self {
+        Self {
+            image: vk::Image::null(),
+            view: vk::ImageView::null(),
+            extent: vk::Extent3D {
+                width: 0,
+                height: 0,
+                depth: 0,
+            },
+            allocation: vk_mem::Allocation::null(),
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct VulkanData {
     pub vertex_shader_module: vk::ShaderModule,
@@ -35,6 +57,7 @@ pub struct VulkanData {
     pub render_pass: vk::RenderPass,
     pub solid_pipeline: vk::Pipeline,
     pub wireframe_pipeline: vk::Pipeline,
+    pub depth_buffer: MemImage,
     pub framebuffers: Vec<vk::Framebuffer>,
     pub should_resize: bool,
     pub image_available_semaphore: vk::Semaphore,
@@ -62,13 +85,27 @@ impl VulkanData {
 
     pub fn resize(&mut self, vulkan_base: &VulkanBase) -> Result<(), String> {
         unsafe {
+            let _ = vulkan_base
+                .allocator
+                .destroy_image(self.depth_buffer.image, &self.depth_buffer.allocation);
+
+            vulkan_base
+                .device
+                .destroy_image_view(self.depth_buffer.view, None);
+
             for &framebuffer in &self.framebuffers {
                 vulkan_base.device.destroy_framebuffer(framebuffer, None);
             }
         }
 
-        self.framebuffers =
-            vulkan::create_framebuffers(vulkan_base, self.render_pass, vulkan_base.surface_extent)?;
+        self.depth_buffer = vulkan::create_depth_buffer(vulkan_base)?;
+
+        self.framebuffers = vulkan::create_framebuffers(
+            vulkan_base,
+            self.render_pass,
+            vulkan_base.surface_extent,
+            self.depth_buffer.view,
+        )?;
 
         Ok(())
     }
@@ -136,6 +173,14 @@ impl VulkanData {
             vulkan_base
                 .device
                 .destroy_pipeline(self.wireframe_pipeline, None);
+
+            let _ = vulkan_base
+                .allocator
+                .destroy_image(self.depth_buffer.image, &self.depth_buffer.allocation);
+
+            vulkan_base
+                .device
+                .destroy_image_view(self.depth_buffer.view, None);
 
             for &framebuffer in &self.framebuffers {
                 vulkan_base.device.destroy_framebuffer(framebuffer, None);
@@ -245,10 +290,12 @@ fn new_internal(vulkan_data: &mut VulkanData, vulkan_base: &VulkanBase) -> Resul
     )?;
     vulkan_data.solid_pipeline = solid_pipeline;
     vulkan_data.wireframe_pipeline = wireframe_pipeline;
+    vulkan_data.depth_buffer = vulkan::create_depth_buffer(vulkan_base)?;
     vulkan_data.framebuffers = vulkan::create_framebuffers(
         vulkan_base,
         vulkan_data.render_pass,
         vulkan_base.surface_extent,
+        vulkan_data.depth_buffer.view,
     )?;
     vulkan_data.image_available_semaphore =
         vulkan::create_semaphore(vulkan_base, "image available semaphore")?;

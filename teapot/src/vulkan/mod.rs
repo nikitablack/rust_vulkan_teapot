@@ -1,5 +1,6 @@
 mod create_buffer;
 mod create_command_pools;
+mod create_depth_buffer;
 mod create_descriptor_pools;
 mod create_descriptor_set_layout;
 mod create_fences;
@@ -16,6 +17,7 @@ mod vulkan_data;
 
 pub use create_buffer::*;
 pub use create_command_pools::*;
+pub use create_depth_buffer::*;
 pub use create_descriptor_pools::*;
 pub use create_descriptor_set_layout::*;
 pub use create_fences::*;
