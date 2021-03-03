@@ -48,10 +48,6 @@ fn check_device_suitability(
         ));
     }
 
-    if properties.device_type != vk::PhysicalDeviceType::DISCRETE_GPU {
-        return Err(String::from("the device is not a discrete GPU"));
-    }
-
     let features = unsafe { instance.get_physical_device_features(physical_device) };
 
     // TODO pass as parameter
