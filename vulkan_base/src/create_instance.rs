@@ -10,8 +10,14 @@ pub fn create_instance<'a>(
         .map(|ext| ext.as_ptr())
         .collect::<Vec<_>>();
 
-    let create_info =
-        vk::InstanceCreateInfo::builder().enabled_extension_names(&extension_names_raw);
+    let app_info = vk::ApplicationInfo::builder()
+        .api_version(vk::make_version(1, 1, 0))
+        .build();
+
+    let create_info = vk::InstanceCreateInfo::builder()
+        .enabled_extension_names(&extension_names_raw)
+        .application_info(&app_info)
+        .build();
 
     unsafe {
         entry
