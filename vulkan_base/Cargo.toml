@@ -5,7 +5,7 @@ name = "vulkan_base"
 version = "0.1.0"
 
 [dependencies]
-ash = "0.31.0"
-ash-window = "0.5.0"
+ash = "0.32.0"
+ash-window = "0.6.0"
 log = "0.4"
 winit = "0.24.0"

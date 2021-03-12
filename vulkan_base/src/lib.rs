@@ -126,7 +126,8 @@ fn new_internal<'a, 'b>(
     required_device_extensions: &Vec<&'b std::ffi::CStr>,
     enable_debug_utils: bool,
 ) -> Result<(), String> {
-    state.entry = Some(ash::Entry::new().map_err(|_| String::from("failed to create Entry"))?);
+    state.entry =
+        unsafe { Some(ash::Entry::new().map_err(|_| String::from("failed to create Entry"))?) };
     let entry = state.entry.as_ref().unwrap();
 
     check_instance_version(entry)?;
