@@ -30,7 +30,6 @@ pub struct VulkanData {
     pub instances_mem_buffer: MemBuffer,
     pub uniform_mem_buffers: Vec<MemBuffer>,
     pub descriptor_set_layout: vk::DescriptorSetLayout,
-    pub descriptor_pools: Vec<vk::DescriptorPool>,
     pub pipeline_layout: vk::PipelineLayout,
     pub render_pass: vk::RenderPass,
     pub solid_pipeline: vk::Pipeline,
@@ -90,12 +89,6 @@ impl VulkanData {
             vulkan_base
                 .device
                 .destroy_descriptor_set_layout(self.descriptor_set_layout, None);
-
-            for &descriptor_pool in &self.descriptor_pools {
-                vulkan_base
-                    .device
-                    .destroy_descriptor_pool(descriptor_pool, None);
-            }
 
             vulkan_base
                 .device
@@ -186,7 +179,6 @@ fn new_internal(vulkan_data: &mut VulkanData, vulkan_base: &VulkanBase) -> Resul
     }
 
     vulkan_data.descriptor_set_layout = vulkan::create_descriptor_set_layout(vulkan_base)?;
-    vulkan_data.descriptor_pools = vulkan::create_descriptor_pools(vulkan_base)?;
     vulkan_data.pipeline_layout =
         vulkan::create_pipeline_layout(vulkan_base, vulkan_data.descriptor_set_layout)?;
     vulkan_data.render_pass = vulkan::create_render_pass(vulkan_base)?;
