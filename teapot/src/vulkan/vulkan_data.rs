@@ -52,7 +52,6 @@ pub struct VulkanData {
     pub instances_mem_buffer: MemBuffer,
     pub uniform_mem_buffers: Vec<MemBuffer>,
     pub descriptor_set_layout: vk::DescriptorSetLayout,
-    pub descriptor_pools: Vec<vk::DescriptorPool>,
     pub pipeline_layout: vk::PipelineLayout,
     pub render_pass: vk::RenderPass,
     pub solid_pipeline: vk::Pipeline,
@@ -64,6 +63,7 @@ pub struct VulkanData {
     pub rendering_finished_semaphore: vk::Semaphore,
     pub fences: Vec<vk::Fence>,
     pub command_pools: Vec<vk::CommandPool>,
+    pub descriptor_pools: Vec<vk::DescriptorPool>,
     pub available_command_buffers: Vec<Vec<vk::CommandBuffer>>,
     pub used_command_buffers: Vec<Vec<vk::CommandBuffer>>,
     pub curr_resource_index: u32,
@@ -152,12 +152,6 @@ impl VulkanData {
                 .device
                 .destroy_descriptor_set_layout(self.descriptor_set_layout, None);
 
-            for &descriptor_pool in &self.descriptor_pools {
-                vulkan_base
-                    .device
-                    .destroy_descriptor_pool(descriptor_pool, None);
-            }
-
             vulkan_base
                 .device
                 .destroy_pipeline_layout(self.pipeline_layout, None);
@@ -200,6 +194,12 @@ impl VulkanData {
 
             for &command_pool in &self.command_pools {
                 vulkan_base.device.destroy_command_pool(command_pool, None);
+            }
+
+            for &descriptor_pool in &self.descriptor_pools {
+                vulkan_base
+                    .device
+                    .destroy_descriptor_pool(descriptor_pool, None);
             }
         }
     }
@@ -275,7 +275,6 @@ fn new_internal(vulkan_data: &mut VulkanData, vulkan_base: &VulkanBase) -> Resul
     }
 
     vulkan_data.descriptor_set_layout = vulkan::create_descriptor_set_layout(vulkan_base)?;
-    vulkan_data.descriptor_pools = vulkan::create_descriptor_pools(vulkan_base)?;
     vulkan_data.pipeline_layout =
         vulkan::create_pipeline_layout(vulkan_base, vulkan_data.descriptor_set_layout)?;
     vulkan_data.render_pass = vulkan::create_render_pass(vulkan_base)?;
@@ -304,6 +303,7 @@ fn new_internal(vulkan_data: &mut VulkanData, vulkan_base: &VulkanBase) -> Resul
 
     vulkan_data.fences = vulkan::create_fences(vulkan_base)?;
     vulkan_data.command_pools = vulkan::create_command_pools(vulkan_base)?;
+    vulkan_data.descriptor_pools = vulkan::create_descriptor_pools(vulkan_base)?;
     vulkan_data.available_command_buffers = vec![vec![]; crate::CONCURRENT_RESOURCE_COUNT as usize];
     vulkan_data.used_command_buffers = vec![vec![]; crate::CONCURRENT_RESOURCE_COUNT as usize];
     vulkan_data.tesselation_level = 1.0;
