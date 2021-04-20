@@ -12,10 +12,10 @@ pub fn create_pipeline_layout(
         size: 4,
     };
 
-    let laytouts = [descriptor_set_layout];
+    let layouts = [descriptor_set_layout];
     let ranges = [push_const_range];
     let create_info = vk::PipelineLayoutCreateInfo::builder()
-        .set_layouts(&laytouts)
+        .set_layouts(&layouts)
         .push_constant_ranges(&ranges)
         .build();
 
