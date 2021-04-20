@@ -60,7 +60,6 @@ pub fn create_pipelines(
 
     let attachments = [col_blend_attachment_state];
     let col_blend_state = vk::PipelineColorBlendStateCreateInfo::builder()
-        .logic_op(vk::LogicOp::CLEAR)
         .attachments(&attachments)
         .build();
 
@@ -99,10 +98,10 @@ pub fn create_pipelines(
         .rasterization_state(&raster_state)
         .color_blend_state(&col_blend_state)
         .dynamic_state(&dyn_state)
+        .viewport_state(&viewport_state)
         .layout(pipeline_layout)
         .render_pass(render_pass)
         .subpass(0)
-        .viewport_state(&viewport_state)
         .multisample_state(&multisample_state)
         .tessellation_state(&tessellation_state)
         .vertex_input_state(&vert_inp_state)
@@ -116,6 +115,7 @@ pub fn create_pipelines(
         .build();
 
     let mut wireframe_pipeline_create_info = solid_pipeline_create_info;
+    wireframe_pipeline_create_info.flags = vk::PipelineCreateFlags::DERIVATIVE;
     wireframe_pipeline_create_info.p_rasterization_state = &raster_state;
     wireframe_pipeline_create_info.base_pipeline_index = 0;
 
@@ -127,7 +127,7 @@ pub fn create_pipelines(
                 &[solid_pipeline_create_info, wireframe_pipeline_create_info],
                 None,
             )
-            .map_err(|_| String::from("failed to create solid pipeline"))?
+            .map_err(|_| String::from("failed to create pipelines"))?
     };
 
     let solid_pipeline = pipelines[0];
