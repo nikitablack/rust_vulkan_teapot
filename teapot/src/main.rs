@@ -124,7 +124,7 @@ fn main() {
                     &vk_base,
                     (std::time::Instant::now() - start_time).as_secs_f32(),
                 ) {
-                    panic!(msg);
+                    panic!("{}", msg);
                 }
 
                 vk_data.curr_resource_index =
