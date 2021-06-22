@@ -46,7 +46,7 @@ fn main() {
         Ok(vk_base) => vk_base,
         Err(msg) => {
             log::error!("{}", msg);
-            panic!(msg);
+            panic!("{}", msg);
         }
     };
 
@@ -55,7 +55,7 @@ fn main() {
         Ok(vk_data) => vk_data,
         Err(msg) => {
             log::error!("{}", msg);
-            panic!(msg);
+            panic!("{}", msg);
         }
     };
 
