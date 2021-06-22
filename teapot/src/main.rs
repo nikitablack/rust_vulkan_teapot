@@ -107,11 +107,11 @@ fn main() {
                     log::info!("handling resize");
 
                     if let Err(msg) = vk_base.resize(&window) {
-                        panic!(msg);
+                        panic!("{}", msg);
                     }
 
                     if let Err(msg) = vk_data.resize(&vk_base) {
-                        panic!(msg);
+                        panic!("{}", msg);
                     }
                 }
 
