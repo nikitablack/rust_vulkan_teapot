@@ -13,6 +13,7 @@ fn main() {
         simplelog::LevelFilter::Info,
         simplelog::Config::default(),
         simplelog::TerminalMode::Mixed,
+        simplelog::ColorChoice::Auto,
     )];
     if let Ok(file) = std::fs::File::create("log.txt") {
         loggers.push(simplelog::WriteLogger::new(
@@ -48,7 +49,7 @@ fn main() {
         Ok(vk_base) => vk_base,
         Err(msg) => {
             log::error!("{}", msg);
-            panic!(msg);
+            panic!("{}", msg);
         }
     };
 
@@ -57,7 +58,7 @@ fn main() {
         Ok(vk_data) => vk_data,
         Err(msg) => {
             log::error!("{}", msg);
-            panic!(msg);
+            panic!("{}", msg);
         }
     };
 
