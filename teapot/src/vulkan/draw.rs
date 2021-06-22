@@ -470,6 +470,16 @@ pub fn draw(
         )
     };
 
+    vulkan_base
+        .allocator
+        .flush_allocation(&curr_uniform_buffer.allocation, 0, vk::WHOLE_SIZE as usize)
+        .map_err(|_| {
+            format!(
+                "failed to flush allocation for uniform buffer {}",
+                vulkan_data.curr_resource_index
+            )
+        })?;
+
     unsafe {
         vulkan_base.device.cmd_push_constants(
             command_buffer,
