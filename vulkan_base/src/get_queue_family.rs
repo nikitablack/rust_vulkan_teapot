@@ -1,5 +1,4 @@
 use ash::extensions::khr;
-use ash::version::InstanceV1_0;
 use ash::vk;
 
 pub fn get_queue_family(

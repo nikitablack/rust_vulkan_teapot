@@ -1,4 +1,3 @@
-use ash::version::InstanceV1_0;
 use ash::vk;
 
 pub fn create_logical_device<'a>(

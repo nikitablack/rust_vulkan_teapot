@@ -1,5 +1,4 @@
 use crate::vulkan;
-use ash::version::DeviceV1_0;
 use ash::vk;
 use std::io::Read;
 

@@ -9,8 +9,6 @@ mod get_queue_family;
 mod get_surface_format;
 
 use ash::extensions::khr;
-use ash::version::DeviceV1_0;
-use ash::version::InstanceV1_0;
 use ash::vk;
 
 use check_instance_version::*;
@@ -172,9 +170,9 @@ fn new_internal<'a, 'b>(
     log::info!("selected physical device {:?}", device_name);
     log::info!(
         "\tsupported api version: {}.{}.{}",
-        vk::version_major(state.physical_device_properties.api_version),
-        vk::version_minor(state.physical_device_properties.api_version),
-        vk::version_patch(state.physical_device_properties.api_version)
+        vk::api_version_major(state.physical_device_properties.api_version),
+        vk::api_version_minor(state.physical_device_properties.api_version),
+        vk::api_version_patch(state.physical_device_properties.api_version)
     );
     log::info!(
         "\tdriver version: {}",

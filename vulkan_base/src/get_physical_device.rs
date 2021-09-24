@@ -1,4 +1,3 @@
-use ash::version::InstanceV1_0;
 use ash::vk;
 
 fn check_required_device_extensions(
@@ -40,11 +39,11 @@ fn check_device_suitability(
     required_extensions: &Vec<&std::ffi::CStr>,
     properties: &vk::PhysicalDeviceProperties,
 ) -> Result<(), String> {
-    if vk::version_major(properties.api_version) < 1
-        && vk::version_minor(properties.api_version) < 1
+    if vk::api_version_major(properties.api_version) < 1
+        && vk::api_version_minor(properties.api_version) < 2
     {
         return Err(String::from(
-            "the device does not support API version 1.1.0",
+            "the device does not support API version 1.2.0",
         ));
     }
 

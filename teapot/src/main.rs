@@ -1,6 +1,5 @@
 mod vulkan;
 
-use ash::version::DeviceV1_0;
 use vulkan::VulkanData;
 use vulkan_base::VulkanBase;
 

@@ -1,5 +1,5 @@
 use crate::vulkan;
-use ash::{version::DeviceV1_0, vk};
+use ash::vk;
 use vulkan_base::VulkanBase;
 
 #[derive(Default)]
