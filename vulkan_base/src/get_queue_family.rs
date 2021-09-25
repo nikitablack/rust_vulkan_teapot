@@ -2,13 +2,12 @@ use ash::extensions::khr;
 use ash::vk;
 
 pub fn get_queue_family(
+    instance: &ash::Instance,
     physical_device: vk::PhysicalDevice,
-    instance_loader: &ash::Instance,
     surface_loader: &khr::Surface,
     surface: vk::SurfaceKHR,
 ) -> Result<u32, String> {
-    let props =
-        unsafe { instance_loader.get_physical_device_queue_family_properties(physical_device) };
+    let props = unsafe { instance.get_physical_device_queue_family_properties(physical_device) };
 
     for (ind, p) in props.iter().enumerate() {
         if p.queue_count > 0 && p.queue_flags.contains(vk::QueueFlags::GRAPHICS) {
@@ -28,6 +27,7 @@ pub fn get_queue_family(
             };
 
             if present_supported {
+                log::info!("selected queue family: {}", ind);
                 return Ok(ind as u32);
             }
         }

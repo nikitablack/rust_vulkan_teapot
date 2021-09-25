@@ -83,6 +83,7 @@ pub fn get_physical_device<'a>(
 
     for physical_device in devices {
         let properties = unsafe { instance.get_physical_device_properties(physical_device) };
+        let device_name = unsafe { std::ffi::CStr::from_ptr(properties.device_name.as_ptr()) };
 
         if let Err(msg) = check_device_suitability(
             instance,
@@ -90,9 +91,19 @@ pub fn get_physical_device<'a>(
             required_device_extensions,
             &properties,
         ) {
-            log::warn!("{}", msg);
+            log::warn!("{:?}: {}", device_name, msg);
             continue;
         }
+
+        log::info!("all extensions are supported",);
+        log::info!("selected physical device {:?}", device_name);
+        log::info!(
+            "supported api version: {}.{}.{}",
+            vk::api_version_major(properties.api_version),
+            vk::api_version_minor(properties.api_version),
+            vk::api_version_patch(properties.api_version)
+        );
+        log::info!("driver version: {}", properties.driver_version);
 
         return Ok(physical_device);
     }

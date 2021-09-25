@@ -18,9 +18,13 @@ pub fn create_instance<'a>(
         .application_info(&app_info)
         .build();
 
-    unsafe {
+    let instance = unsafe {
         entry
             .create_instance(&create_info, None)
-            .map_err(|_| String::from("failed to create instance"))
-    }
+            .map_err(|_| String::from("failed to create instance"))?
+    };
+
+    log::info!("instance created");
+
+    Ok(instance)
 }

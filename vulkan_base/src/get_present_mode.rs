@@ -24,12 +24,24 @@ pub fn get_present_mode(
     }
 
     if modes.contains(&vk::PresentModeKHR::MAILBOX) {
-        return Ok(vk::PresentModeKHR::MAILBOX);
+        let present_mode = vk::PresentModeKHR::MAILBOX;
+
+        log::info!("selected present mode: {:?}", present_mode);
+
+        return Ok(present_mode);
     }
 
     if modes.contains(&vk::PresentModeKHR::IMMEDIATE) {
-        return Ok(vk::PresentModeKHR::IMMEDIATE);
+        let present_mode = vk::PresentModeKHR::IMMEDIATE;
+
+        log::info!("selected present mode: {:?}", present_mode);
+
+        return Ok(present_mode);
     }
 
-    Ok(vk::PresentModeKHR::FIFO)
+    let present_mode = vk::PresentModeKHR::FIFO;
+
+    log::info!("selected present mode: {:?}", present_mode);
+
+    Ok(present_mode)
 }

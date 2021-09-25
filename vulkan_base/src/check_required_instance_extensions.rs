@@ -33,5 +33,7 @@ pub fn check_required_instance_extensions<'a>(
         }
     }
 
+    log::info!("all extensions are supported",);
+
     Ok(())
 }

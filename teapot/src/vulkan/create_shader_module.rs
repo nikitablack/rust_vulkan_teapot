@@ -39,5 +39,7 @@ pub fn create_shader_module(
         object_name,
     );
 
+    log::info!("{} created", object_name);
+
     Ok(shader_module)
 }
