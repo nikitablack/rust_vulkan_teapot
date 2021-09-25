@@ -1,5 +1,4 @@
 use crate::vulkan;
-use ash::version::DeviceV1_0;
 use ash::vk;
 use std::io::Read;
 
@@ -39,6 +38,8 @@ pub fn create_shader_module(
         shader_module,
         object_name,
     );
+
+    log::info!("{} created", object_name);
 
     Ok(shader_module)
 }

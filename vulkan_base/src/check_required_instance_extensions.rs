@@ -1,4 +1,3 @@
-use ash::version::EntryV1_0;
 use ash::vk;
 
 pub fn check_required_instance_extensions<'a>(
@@ -33,6 +32,8 @@ pub fn check_required_instance_extensions<'a>(
             ));
         }
     }
+
+    log::info!("all extensions are supported",);
 
     Ok(())
 }

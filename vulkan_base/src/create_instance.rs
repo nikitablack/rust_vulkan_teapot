@@ -1,4 +1,3 @@
-use ash::version::EntryV1_0;
 use ash::vk;
 
 pub fn create_instance<'a>(
@@ -11,7 +10,7 @@ pub fn create_instance<'a>(
         .collect::<Vec<_>>();
 
     let app_info = vk::ApplicationInfo::builder()
-        .api_version(vk::make_version(1, 1, 0))
+        .api_version(vk::make_api_version(0, 1, 2, 0))
         .build();
 
     let create_info = vk::InstanceCreateInfo::builder()
@@ -19,9 +18,13 @@ pub fn create_instance<'a>(
         .application_info(&app_info)
         .build();
 
-    unsafe {
+    let instance = unsafe {
         entry
             .create_instance(&create_info, None)
-            .map_err(|_| String::from("failed to create instance"))
-    }
+            .map_err(|_| String::from("failed to create instance"))?
+    };
+
+    log::info!("instance created");
+
+    Ok(instance)
 }

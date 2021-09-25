@@ -7,14 +7,15 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ash = "0.32.0"
-ash-window = "0.6.0"
-log = "0.4"
-simplelog = "0.10.0"
-winit = "0.25.0"
-vulkan_base = { path="../vulkan_base" }
-vk-mem = "0.2.2"
+ash = "0.33.3"
+ash-window = "0.7.0"
 bytemuck = "1.5.0"
+log = "0.4"
+scopeguard = "1.1.0"
+simplelog = "0.10.0"
+vk-mem = "0.2.2"
+vulkan_base = { path = "../vulkan_base" }
+winit = "0.25.0"
 
 [build-dependencies]
 shaderc = "0.7.1"
