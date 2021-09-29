@@ -1,282 +1,243 @@
-use crate::vulkan;
-use ash::version::DeviceV1_0;
+use std::cell::RefCell;
+
+use crate::vulkan::{self, MemBuffer};
 use ash::vk;
-use vulkan_base::VulkanBase;
 
 pub fn create_buffer(
-    vulkan_base: &VulkanBase,
+    device: &ash::Device,
+    allocator: &mut gpu_allocator::vulkan::Allocator,
+    debug_utils_loader: &Option<ash::extensions::ext::DebugUtils>,
     size: vk::DeviceSize,
     buffer_usage: vk::BufferUsageFlags,
-    memory_usage: vk_mem::MemoryUsage,
-    memory_flags: vk_mem::AllocationCreateFlags,
+    memory_location: gpu_allocator::MemoryLocation,
     object_name: &str,
 ) -> Result<vulkan::MemBuffer, String> {
+    // buffer
+    log::info!("{}: creating", object_name);
+
     let buffer_create_info = vk::BufferCreateInfo::builder()
         .size(size)
         .usage(buffer_usage)
         .sharing_mode(vk::SharingMode::EXCLUSIVE);
 
-    let allocation_create_info = vk_mem::AllocationCreateInfo {
-        usage: memory_usage,
-        flags: memory_flags,
-        ..Default::default()
+    let buffer = unsafe {
+        device
+            .create_buffer(&buffer_create_info, None)
+            .map_err(|_| format!("{}: failed to create", object_name))?
     };
 
-    let (buffer, allocation, allocation_info) = vulkan_base
-        .allocator
-        .create_buffer(&buffer_create_info, &allocation_create_info)
-        .map_err(|_| format!("failed to create buffer {}", object_name))?;
-
-    vulkan::set_debug_utils_object_name(
-        &vulkan_base.debug_utils_loader,
-        vulkan_base.device.handle(),
-        buffer,
-        object_name,
-    );
-
-    vulkan::set_debug_utils_object_name(
-        &vulkan_base.debug_utils_loader,
-        vulkan_base.device.handle(),
-        allocation_info.get_device_memory(),
-        &format!("{} device memory", object_name),
-    );
-
-    Ok(vulkan::MemBuffer {
-        buffer,
-        size,
-        allocation,
-    })
-}
-
-pub fn create_buffer_with_flags(
-    vulkan_base: &VulkanBase,
-    size: vk::DeviceSize,
-    buffer_usage: vk::BufferUsageFlags,
-    memory_required_flags: vk::MemoryPropertyFlags,
-    memory_preferred_flags: vk::MemoryPropertyFlags,
-    allocation_flags: vk_mem::AllocationCreateFlags,
-    object_name: &str,
-) -> Result<vulkan::MemBuffer, String> {
-    let buffer_create_info = vk::BufferCreateInfo::builder()
-        .size(size)
-        .usage(buffer_usage)
-        .sharing_mode(vk::SharingMode::EXCLUSIVE)
-        .build();
-
-    let allocation_create_info = vk_mem::AllocationCreateInfo {
-        usage: vk_mem::MemoryUsage::Unknown,
-        flags: allocation_flags,
-        required_flags: memory_required_flags,
-        preferred_flags: memory_preferred_flags,
-        ..Default::default()
-    };
-
-    let (buffer, allocation, allocation_info) = vulkan_base
-        .allocator
-        .create_buffer(&buffer_create_info, &allocation_create_info)
-        .map_err(|_| format!("failed to create buffer {}", object_name))?;
-
-    vulkan::set_debug_utils_object_name(
-        &vulkan_base.debug_utils_loader,
-        vulkan_base.device.handle(),
-        buffer,
-        object_name,
-    );
-
-    vulkan::set_debug_utils_object_name(
-        &vulkan_base.debug_utils_loader,
-        vulkan_base.device.handle(),
-        allocation_info.get_device_memory(),
-        &format!("{} device memory", object_name),
-    );
-
-    Ok(vulkan::MemBuffer {
-        buffer,
-        size,
-        allocation,
-    })
-}
-
-#[derive(Default)]
-struct InternalState {
-    staging_mem_buffer: Option<vulkan::MemBuffer>,
-    gpu_mem_buffer: Option<vulkan::MemBuffer>,
-    command_pool: Option<vk::CommandPool>,
-}
-
-pub fn create_buffer_init(
-    vulkan_base: &VulkanBase,
-    init_data: &[u8],
-    buffer_usage: vk::BufferUsageFlags,
-    buffer_access_mask: vk::AccessFlags,
-    buffer_stage_flags: vk::PipelineStageFlags,
-    object_name: &str,
-) -> Result<vulkan::MemBuffer, String> {
-    let mut internal_state = InternalState::default();
-
-    let res = create_buffer_init_internal(
-        &mut internal_state,
-        vulkan_base,
-        init_data,
-        buffer_usage,
-        buffer_access_mask,
-        buffer_stage_flags,
-        object_name,
-    );
-
-    if let Some(staging_mem_buffer) = internal_state.staging_mem_buffer.as_ref() {
-        let _ = vulkan_base
-            .allocator
-            .destroy_buffer(staging_mem_buffer.buffer, &staging_mem_buffer.allocation);
-    }
-
-    if let Some(command_pool) = internal_state.command_pool {
+    let buffer_sg = scopeguard::guard(buffer, |buffer| {
+        log::info!("{}: something went wrong, destroying", object_name);
         unsafe {
-            vulkan_base.device.destroy_command_pool(command_pool, None);
+            device.destroy_buffer(buffer, None);
         }
-    }
+    });
 
-    res.map(|_| internal_state.gpu_mem_buffer.unwrap())
-}
+    log::info!("{}: created", object_name);
 
-fn create_buffer_init_internal(
-    internal_state: &mut InternalState,
-    vulkan_base: &VulkanBase,
-    init_data: &[u8],
-    buffer_usage: vk::BufferUsageFlags,
-    buffer_access_mask: vk::AccessFlags,
-    buffer_stage_flags: vk::PipelineStageFlags,
-    object_name: &str,
-) -> Result<(), String> {
-    let staging_mem_buffer = create_staging_buffer(
-        vulkan_base,
-        init_data.len() as vk::DeviceSize,
-        &format!("staging {}", object_name),
-    )?;
+    // allocation
+    log::info!("{}: allocating memory", object_name);
 
-    let allocation_info = vulkan_base
-        .allocator
-        .get_allocation_info(&staging_mem_buffer.allocation)
-        .map_err(|_| format!("failed to get allocation info for {}", object_name))?;
+    let memory_requirements = unsafe { device.get_buffer_memory_requirements(*buffer_sg) };
+
+    let allocation_create_desc = gpu_allocator::vulkan::AllocationCreateDesc {
+        name: object_name,
+        requirements: memory_requirements,
+        location: memory_location,
+        linear: true,
+    };
+
+    let allocation = allocator
+        .allocate(&allocation_create_desc)
+        .map_err(|_| format!("{}: failed to allocate memory", object_name))?;
+
+    let allocation_sg = scopeguard::guard(allocation, |allocation| {
+        log::info!("{}: something went wrong, freeing allocation", object_name);
+        let _ = allocator.free(allocation);
+    });
+
+    log::info!("{}: memory allocated", object_name);
+
+    // binding
+    log::info!("{}: binding memory", object_name);
 
     unsafe {
-        std::ptr::copy_nonoverlapping(
-            init_data.as_ptr(),
-            allocation_info.get_mapped_data(),
-            init_data.len(),
-        )
+        device
+            .bind_buffer_memory(*buffer_sg, allocation_sg.memory(), allocation_sg.offset())
+            .map_err(|_| format!("{}: failed to bind memory", object_name))?
     };
 
-    internal_state.staging_mem_buffer = Some(staging_mem_buffer);
+    log::info!("{}: memory bound", object_name);
 
-    vulkan_base
-        .allocator
-        .flush_allocation(
-            &internal_state
-                .staging_mem_buffer
-                .as_ref()
-                .unwrap()
-                .allocation,
-            0,
-            vk::WHOLE_SIZE as usize,
-        )
-        .map_err(|_| format!("failed to flush allocation for staging {}", object_name))?;
-
-    internal_state.gpu_mem_buffer = Some(create_gpu_buffer(
-        vulkan_base,
-        buffer_usage,
-        init_data.len() as vk::DeviceSize,
+    vulkan::set_debug_utils_object_name(
+        debug_utils_loader,
+        device.handle(),
+        *buffer_sg,
         object_name,
-    )?);
+    );
 
-    let command_pool = create_command_pool(vulkan_base, object_name)?;
+    vulkan::set_debug_utils_object_name(
+        &debug_utils_loader,
+        device.handle(),
+        unsafe { allocation_sg.memory() },
+        &format!("{} memory", object_name),
+    );
 
-    internal_state.command_pool = Some(command_pool);
+    Ok(vulkan::MemBuffer {
+        buffer: scopeguard::ScopeGuard::into_inner(buffer_sg),
+        size,
+        allocation: scopeguard::ScopeGuard::into_inner(allocation_sg),
+    })
+}
 
-    let command_buffer = allocate_command_buffer(vulkan_base, command_pool, object_name)?;
+pub fn create_gpu_buffer_init(
+    device: &ash::Device,
+    allocator: &mut gpu_allocator::vulkan::Allocator,
+    debug_utils_loader: &Option<ash::extensions::ext::DebugUtils>,
+    queue_family: u32,
+    queue: vk::Queue,
+    init_data: &[u8],
+    buffer_usage: vk::BufferUsageFlags,
+    buffer_access_mask: vk::AccessFlags,
+    buffer_stage_flags: vk::PipelineStageFlags,
+    object_name: &str,
+) -> Result<vulkan::MemBuffer, String> {
+    let allocator_rc = RefCell::new(allocator);
 
+    // staging buffer
+    log::info!("{}: creating with data", object_name);
+
+    let staging_mem_buffer = create_buffer(
+        device,
+        *allocator_rc.borrow_mut(),
+        debug_utils_loader,
+        init_data.len() as vk::DeviceSize,
+        vk::BufferUsageFlags::TRANSFER_SRC,
+        gpu_allocator::MemoryLocation::CpuToGpu,
+        &format!("{} staging", object_name),
+    )?;
+
+    let staging_buffer_sg = scopeguard::guard(staging_mem_buffer.buffer, |buffer| {
+        log::info!("{} staging: something went wrong, destroying", object_name);
+        unsafe {
+            device.destroy_buffer(buffer, None);
+        }
+    });
+
+    let mut staging_allocation_sg =
+        scopeguard::guard(staging_mem_buffer.allocation, |allocation| {
+            log::info!(
+                "{} stagingsomething went wrong, freeing memory",
+                object_name
+            );
+            let _ = allocator_rc.borrow_mut().free(allocation);
+        });
+
+    // copy data to staging memory
+    log::info!("{} staging: copying data to mapped memory", object_name);
+
+    staging_allocation_sg.mapped_slice_mut().unwrap()[..init_data.len()].copy_from_slice(init_data);
+
+    // gpu buffer
+    let gpu_mem_buffer = create_buffer(
+        device,
+        *allocator_rc.borrow_mut(),
+        debug_utils_loader,
+        init_data.len() as vk::DeviceSize,
+        buffer_usage | vk::BufferUsageFlags::TRANSFER_DST,
+        gpu_allocator::MemoryLocation::GpuOnly,
+        object_name,
+    )?;
+
+    let gpu_buffer_sg = scopeguard::guard(gpu_mem_buffer.buffer, |buffer| {
+        log::info!("{}: something went wrong, destroying", object_name);
+        unsafe {
+            device.destroy_buffer(buffer, None);
+        }
+    });
+
+    let gpu_allocation_sg = scopeguard::guard(gpu_mem_buffer.allocation, |allocation| {
+        log::info!("{}: something went wrong, freeing memory", object_name);
+        let _ = allocator_rc.borrow_mut().free(allocation);
+    });
+
+    // command pool
+    let command_pool = create_command_pool(device, queue_family, object_name)?;
+    let command_pool_sg = scopeguard::guard(command_pool, |command_pool| {
+        log::info!(
+            "{}: something went wrong, destroying command pool",
+            object_name
+        );
+        unsafe {
+            device.destroy_command_pool(command_pool, None);
+        }
+    });
+
+    // command buffer
+    let command_buffer = allocate_command_buffer(device, *command_pool_sg, object_name)?;
+    // no need to free explicitly, it will be freed implicitly on command pool destruction
+
+    // copy staging memory to gpu memory
     copy_buffer(
-        vulkan_base,
+        device,
+        queue,
         command_buffer,
-        internal_state.staging_mem_buffer.as_ref().unwrap().buffer,
-        internal_state.gpu_mem_buffer.as_ref().unwrap().buffer,
+        *staging_buffer_sg,
+        *gpu_buffer_sg,
         buffer_access_mask,
         buffer_stage_flags,
         init_data.len() as vk::DeviceSize,
         object_name,
     )?;
 
-    Ok(())
-}
+    // clear temporary objects
+    log::info!("{}: destroying temporary objects", object_name);
 
-fn create_staging_buffer(
-    vulkan_base: &VulkanBase,
-    size: vk::DeviceSize,
-    object_name: &str,
-) -> Result<vulkan::MemBuffer, String> {
-    let mem_buffer = vulkan::create_buffer_with_flags(
-        vulkan_base,
-        size,
-        vk::BufferUsageFlags::TRANSFER_SRC,
-        vk::MemoryPropertyFlags::HOST_VISIBLE,
-        vk::MemoryPropertyFlags::HOST_COHERENT,
-        vk_mem::AllocationCreateFlags::MAPPED,
-        object_name,
-    )?;
+    unsafe {
+        device.destroy_buffer(scopeguard::ScopeGuard::into_inner(staging_buffer_sg), None);
+        let _ = allocator_rc
+            .borrow_mut()
+            .free(scopeguard::ScopeGuard::into_inner(staging_allocation_sg));
+        device.destroy_command_pool(scopeguard::ScopeGuard::into_inner(command_pool_sg), None);
+    }
 
-    Ok(mem_buffer)
-}
-
-fn create_gpu_buffer(
-    vulkan_base: &VulkanBase,
-    buffer_usage: vk::BufferUsageFlags,
-    size: vk::DeviceSize,
-    object_name: &str,
-) -> Result<vulkan::MemBuffer, String> {
-    let mem_buffer = vulkan::create_buffer_with_flags(
-        vulkan_base,
-        size,
-        buffer_usage | vk::BufferUsageFlags::TRANSFER_DST,
-        vk::MemoryPropertyFlags::DEVICE_LOCAL,
-        vk::MemoryPropertyFlags::empty(),
-        vk_mem::AllocationCreateFlags::NONE,
-        object_name,
-    )?;
-
-    Ok(mem_buffer)
+    Ok(MemBuffer {
+        buffer: scopeguard::ScopeGuard::into_inner(gpu_buffer_sg),
+        size: gpu_allocation_sg.size(),
+        allocation: scopeguard::ScopeGuard::into_inner(gpu_allocation_sg),
+    })
 }
 
 fn create_command_pool(
-    vulkan_base: &VulkanBase,
+    device: &ash::Device,
+    queue_family: u32,
     object_name: &str,
 ) -> Result<vk::CommandPool, String> {
+    log::info!("{}: creating command pool", object_name);
+
     let create_info = vk::CommandPoolCreateInfo::builder()
         .flags(vk::CommandPoolCreateFlags::TRANSIENT)
-        .queue_family_index(vulkan_base.queue_family)
+        .queue_family_index(queue_family)
         .build();
 
     let command_pool = unsafe {
-        vulkan_base
-            .device
+        device
             .create_command_pool(&create_info, None)
-            .map_err(|_| format!("failed to create copy command pool for {}", object_name))?
+            .map_err(|_| format!("{}: failed to create command pool", object_name))?
     };
 
-    vulkan::set_debug_utils_object_name(
-        &vulkan_base.debug_utils_loader,
-        vulkan_base.device.handle(),
-        command_pool,
-        &format!("copy command pool for {}", object_name),
-    );
+    log::info!("{}: command pool created", object_name);
 
     Ok(command_pool)
 }
 
 fn allocate_command_buffer(
-    vulkan_base: &VulkanBase,
+    device: &ash::Device,
     command_pool: vk::CommandPool,
     object_name: &str,
 ) -> Result<vk::CommandBuffer, String> {
+    log::info!("{}: allocating command buffer", object_name);
+
     let allocate_info = vk::CommandBufferAllocateInfo::builder()
         .command_pool(command_pool)
         .level(vk::CommandBufferLevel::PRIMARY)
@@ -284,26 +245,19 @@ fn allocate_command_buffer(
         .build();
 
     let command_buffers = unsafe {
-        vulkan_base
-            .device
+        device
             .allocate_command_buffers(&allocate_info)
-            .map_err(|_| format!("failed to allocate copy command buffer for {}", object_name))?
+            .map_err(|_| format!("{}: failed to allocate copy command buffer", object_name))?
     };
 
-    let command_buffer = command_buffers[0];
+    log::info!("{}: command buffer allocated", object_name);
 
-    vulkan::set_debug_utils_object_name(
-        &vulkan_base.debug_utils_loader,
-        vulkan_base.device.handle(),
-        command_buffer,
-        &format!("copy command buffer for {}", object_name),
-    );
-
-    Ok(command_buffer)
+    Ok(command_buffers[0])
 }
 
 fn copy_buffer(
-    vulkan_base: &VulkanBase,
+    device: &ash::Device,
+    queue: vk::Queue,
     command_buffer: vk::CommandBuffer,
     src_buffer: vk::Buffer,
     dst_buffer: vk::Buffer,
@@ -312,15 +266,16 @@ fn copy_buffer(
     size: vk::DeviceSize,
     object_name: &str,
 ) -> Result<(), String> {
+    log::info!("{}: copying buffer to buffer", object_name);
+
     let begin_info = vk::CommandBufferBeginInfo::builder()
         .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT)
         .build();
 
     unsafe {
-        vulkan_base
-            .device
+        device
             .begin_command_buffer(command_buffer, &begin_info)
-            .map_err(|_| format!("failed to begin copy command buffer for {}", object_name))?;
+            .map_err(|_| format!("{}: failed to begin copy command buffer", object_name))?;
 
         let buffer_copy = vk::BufferCopy {
             src_offset: 0,
@@ -328,9 +283,7 @@ fn copy_buffer(
             size,
         };
 
-        vulkan_base
-            .device
-            .cmd_copy_buffer(command_buffer, src_buffer, dst_buffer, &[buffer_copy]);
+        device.cmd_copy_buffer(command_buffer, src_buffer, dst_buffer, &[buffer_copy]);
 
         let after_copy_barrier = vk::BufferMemoryBarrier::builder()
             .src_access_mask(vk::AccessFlags::TRANSFER_WRITE)
@@ -342,7 +295,7 @@ fn copy_buffer(
             .size(size)
             .build();
 
-        vulkan_base.device.cmd_pipeline_barrier(
+        device.cmd_pipeline_barrier(
             command_buffer,
             vk::PipelineStageFlags::TRANSFER,
             buffer_stage_flags,
@@ -352,25 +305,24 @@ fn copy_buffer(
             &[],
         );
 
-        vulkan_base
-            .device
+        device
             .end_command_buffer(command_buffer)
-            .map_err(|_| format!("failed to end copy command buffer for {}", object_name))?;
+            .map_err(|_| format!("{}: failed to end copy command buffer", object_name))?;
 
         let cmd_buffers = [command_buffer];
         let submit_info = vk::SubmitInfo::builder()
             .command_buffers(&cmd_buffers)
             .build();
 
-        vulkan_base
-            .device
-            .queue_submit(vulkan_base.queue, &[submit_info], vk::Fence::null())
-            .map_err(|_| format!("failed to submit copy for {}", object_name))?;
+        device
+            .queue_submit(queue, &[submit_info], vk::Fence::null())
+            .map_err(|_| format!("{}: failed to submit copy", object_name))?;
 
-        vulkan_base
-            .device
-            .queue_wait_idle(vulkan_base.queue)
-            .map_err(|_| format!("failed to wait idle queue for {}", object_name))?;
+        device
+            .queue_wait_idle(queue)
+            .map_err(|_| format!("{}: failed to wait idle queue", object_name))?;
+
+        log::info!("{}: buffer to buffer copied", object_name);
     };
 
     Ok(())

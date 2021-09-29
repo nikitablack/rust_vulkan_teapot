@@ -3,7 +3,8 @@ use ash::vk;
 use std::io::Read;
 
 pub fn create_shader_module(
-    vulkan_base: &vulkan_base::VulkanBase,
+    device: &ash::Device,
+    debug_utils: &Option<ash::extensions::ext::DebugUtils>,
     path: &std::path::Path,
     object_name: &str,
 ) -> Result<vk::ShaderModule, String> {
@@ -26,18 +27,12 @@ pub fn create_shader_module(
         .code(&spirv_u32)
         .build();
 
-    let shader_module = match unsafe { vulkan_base.device.create_shader_module(&create_info, None) }
-    {
+    let shader_module = match unsafe { device.create_shader_module(&create_info, None) } {
         Ok(module) => module,
         Err(_) => return Err(format!("failed to create shader module {:?}", path)),
     };
 
-    vulkan::set_debug_utils_object_name(
-        &vulkan_base.debug_utils_loader,
-        vulkan_base.device.handle(),
-        shader_module,
-        object_name,
-    );
+    vulkan::set_debug_utils_object_name(debug_utils, device.handle(), shader_module, object_name);
 
     log::info!("{} created", object_name);
 

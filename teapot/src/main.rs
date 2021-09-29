@@ -45,7 +45,7 @@ fn main() {
         &device_extensions,
         enable_debug_utils,
     ) {
-        Ok(vk_base) => vk_base,
+        Ok(vk_base) => Some(vk_base),
         Err(msg) => {
             log::error!("{}", msg);
             panic!("{}", msg);
@@ -53,9 +53,10 @@ fn main() {
     };
 
     // vulkan data
-    let vk_data = match VulkanData::new(&vk_base) {
-        Ok(vk_data) => vk_data,
+    let mut vk_data = match VulkanData::new(vk_base.as_mut().unwrap()) {
+        Ok(vk_data) => Some(vk_data),
         Err(msg) => {
+            vk_base.unwrap().clean();
             log::error!("{}", msg);
             panic!("{}", msg);
         }
@@ -80,11 +81,14 @@ fn main() {
 
                 log::info!("exit requested");
 
+                let mut vk_base = vk_base.take().unwrap();
+                let vk_data = vk_data.take().unwrap();
+
                 unsafe {
                     let _ = vk_base.device.device_wait_idle();
                 }
 
-                vk_data.clean(&vk_base);
+                vk_data.clean(&mut vk_base);
                 vk_base.clean();
 
                 app_exit = true;
