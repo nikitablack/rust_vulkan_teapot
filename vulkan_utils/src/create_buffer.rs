@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use crate::vulkan::{self, MemBuffer};
+use crate::MemBuffer;
 use ash::vk;
 
 pub fn create_buffer(
@@ -11,7 +11,7 @@ pub fn create_buffer(
     buffer_usage: vk::BufferUsageFlags,
     memory_location: gpu_allocator::MemoryLocation,
     object_name: &str,
-) -> Result<vulkan::MemBuffer, String> {
+) -> Result<MemBuffer, String> {
     // buffer
     log::info!("{}: creating", object_name);
 
@@ -69,21 +69,21 @@ pub fn create_buffer(
 
     log::info!("{}: memory bound", object_name);
 
-    vulkan_utils::set_debug_utils_object_name(
+    crate::set_debug_utils_object_name(
         debug_utils_loader,
         device.handle(),
         *buffer_sg,
         object_name,
     );
 
-    vulkan_utils::set_debug_utils_object_name(
+    crate::set_debug_utils_object_name(
         &debug_utils_loader,
         device.handle(),
         unsafe { allocation_sg.memory() },
         &format!("{} memory", object_name),
     );
 
-    Ok(vulkan::MemBuffer {
+    Ok(MemBuffer {
         buffer: scopeguard::ScopeGuard::into_inner(buffer_sg),
         size,
         allocation: scopeguard::ScopeGuard::into_inner(allocation_sg),
@@ -101,7 +101,7 @@ pub fn create_gpu_buffer_init(
     buffer_access_mask: vk::AccessFlags,
     buffer_stage_flags: vk::PipelineStageFlags,
     object_name: &str,
-) -> Result<vulkan::MemBuffer, String> {
+) -> Result<MemBuffer, String> {
     let allocator_rc = RefCell::new(allocator);
 
     // staging buffer

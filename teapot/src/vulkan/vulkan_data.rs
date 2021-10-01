@@ -1,26 +1,20 @@
 use std::cell::RefCell;
 
-use crate::{teapot_data, vulkan};
+use crate::teapot_data;
 use ash::vk;
 use scopeguard::{guard, ScopeGuard};
 use vulkan_base::VulkanBase;
-
-pub struct MemBuffer {
-    pub buffer: vk::Buffer,
-    pub size: vk::DeviceSize,
-    pub allocation: gpu_allocator::vulkan::Allocation,
-}
 
 pub struct VulkanData {
     pub vertex_shader_module: vk::ShaderModule,
     pub tese_shader_module: vk::ShaderModule,
     pub tesc_shader_module: vk::ShaderModule,
     pub fragment_shader_module: vk::ShaderModule,
-    pub control_points_mem_buffer: MemBuffer,
-    pub patches_mem_buffer: MemBuffer,
+    pub control_points_mem_buffer: vulkan_utils::MemBuffer,
+    pub patches_mem_buffer: vulkan_utils::MemBuffer,
     pub patch_point_count: u32,
-    pub instances_mem_buffer: MemBuffer,
-    pub uniform_mem_buffers: Vec<MemBuffer>,
+    pub instances_mem_buffer: vulkan_utils::MemBuffer,
+    pub uniform_mem_buffers: Vec<vulkan_utils::MemBuffer>,
 }
 
 impl VulkanData {
@@ -95,7 +89,7 @@ impl VulkanData {
         let teapot_data = teapot_data::TeapotData::new();
 
         let control_points_mem_buffer_sg = {
-            let control_points_mem_buffer = vulkan::create_gpu_buffer_init(
+            let control_points_mem_buffer = vulkan_utils::create_gpu_buffer_init(
                 &vulkan_base.device,
                 *allocator_rc.borrow_mut(),
                 &vulkan_base.debug_utils_loader,
@@ -109,7 +103,7 @@ impl VulkanData {
             )?;
 
             guard(control_points_mem_buffer, |mem_buffer| {
-                log::info!("something went wrong, destroying control points buffer");
+                log::warn!("control points scopeguard: destroying buffer and memory");
                 unsafe {
                     device.destroy_buffer(mem_buffer.buffer, None);
                 }
@@ -118,7 +112,7 @@ impl VulkanData {
         };
 
         let patches_mem_buffer_sg = {
-            let patches_mem_buffer = vulkan::create_gpu_buffer_init(
+            let patches_mem_buffer = vulkan_utils::create_gpu_buffer_init(
                 &vulkan_base.device,
                 *allocator_rc.borrow_mut(),
                 &vulkan_base.debug_utils_loader,
@@ -132,7 +126,7 @@ impl VulkanData {
             )?;
 
             guard(patches_mem_buffer, |mem_buffer| {
-                log::info!("something went wrong, destroying patches buffer");
+                log::warn!("patches scopeguard: destroying buffer and memory");
                 unsafe {
                     device.destroy_buffer(mem_buffer.buffer, None);
                 }
@@ -143,7 +137,7 @@ impl VulkanData {
         let patch_point_count = teapot_data.get_patch_point_count();
 
         let instances_mem_buffer_sg = {
-            let instances_mem_buffer = vulkan::create_gpu_buffer_init(
+            let instances_mem_buffer = vulkan_utils::create_gpu_buffer_init(
                 &vulkan_base.device,
                 *allocator_rc.borrow_mut(),
                 &vulkan_base.debug_utils_loader,
@@ -157,7 +151,7 @@ impl VulkanData {
             )?;
 
             guard(instances_mem_buffer, |mem_buffer| {
-                log::info!("something went wrong, destroying instances buffer");
+                log::warn!("instances scopeguard: destroying buffer and memory");
                 unsafe {
                     device.destroy_buffer(mem_buffer.buffer, None);
                 }
@@ -168,7 +162,7 @@ impl VulkanData {
         let mut uniform_mem_buffer_sgs =
             Vec::with_capacity(crate::CONCURRENT_RESOURCE_COUNT as usize);
         for i in 0..crate::CONCURRENT_RESOURCE_COUNT {
-            let mem_buffer = vulkan::create_buffer(
+            let mem_buffer = vulkan_utils::create_buffer(
                 &vulkan_base.device,
                 *allocator_rc.borrow_mut(),
                 &vulkan_base.debug_utils_loader,
@@ -178,8 +172,12 @@ impl VulkanData {
                 &format!("uniform buffer {}", i),
             )?;
 
-            let uniform_mem_buffer_sg = guard(mem_buffer, |mem_buffer| {
-                log::info!("something went wrong, destroying uniform buffer");
+            let allocator_rc = &allocator_rc;
+            let uniform_mem_buffer_sg = guard(mem_buffer, move |mem_buffer| {
+                log::warn!(
+                    "uniform buffer scopeguard {}: destroying buffer and memory",
+                    i,
+                );
                 unsafe {
                     device.destroy_buffer(mem_buffer.buffer, None);
                 }
