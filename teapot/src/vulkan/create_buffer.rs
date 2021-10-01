@@ -6,7 +6,7 @@ use ash::vk;
 pub fn create_buffer(
     device: &ash::Device,
     allocator: &mut gpu_allocator::vulkan::Allocator,
-    debug_utils_loader: &Option<ash::extensions::ext::DebugUtils>,
+    debug_utils_loader: &ash::extensions::ext::DebugUtils,
     size: vk::DeviceSize,
     buffer_usage: vk::BufferUsageFlags,
     memory_location: gpu_allocator::MemoryLocation,
@@ -69,14 +69,14 @@ pub fn create_buffer(
 
     log::info!("{}: memory bound", object_name);
 
-    vulkan::set_debug_utils_object_name(
+    vulkan_utils::set_debug_utils_object_name(
         debug_utils_loader,
         device.handle(),
         *buffer_sg,
         object_name,
     );
 
-    vulkan::set_debug_utils_object_name(
+    vulkan_utils::set_debug_utils_object_name(
         &debug_utils_loader,
         device.handle(),
         unsafe { allocation_sg.memory() },
@@ -93,7 +93,7 @@ pub fn create_buffer(
 pub fn create_gpu_buffer_init(
     device: &ash::Device,
     allocator: &mut gpu_allocator::vulkan::Allocator,
-    debug_utils_loader: &Option<ash::extensions::ext::DebugUtils>,
+    debug_utils_loader: &ash::extensions::ext::DebugUtils,
     queue_family: u32,
     queue: vk::Queue,
     init_data: &[u8],

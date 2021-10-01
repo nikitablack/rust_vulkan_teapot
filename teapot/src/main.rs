@@ -52,10 +52,9 @@ fn main() {
     };
 
     // vulkan data
-    let mut vk_data = match VulkanData::new(&vk_base.as_ref().unwrap()) {
+    let mut vk_data = match VulkanData::new(vk_base.as_mut().unwrap()) {
         Ok(vk_data) => Some(vk_data),
         Err(msg) => {
-            vk_base.unwrap().clean();
             log::error!("{}", msg);
             let vk_base = vk_base.unwrap();
             vk_base.clean();
@@ -82,7 +81,7 @@ fn main() {
 
                 log::info!("exit requested");
 
-                let vk_base = vk_base.take().unwrap();
+                let mut vk_base = vk_base.take().unwrap();
                 let vk_data = vk_data.take().unwrap();
 
                 unsafe {

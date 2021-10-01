@@ -39,7 +39,7 @@ impl VulkanData {
             scopeguard::guard(vertex_sm, |sm| {
                 log::warn!("vertex shader scopeguard: destroying shader module");
                 unsafe {
-                    vulkan_base.device.destroy_shader_module(sm, None);
+                    device.destroy_shader_module(sm, None);
                 }
             })
         };
@@ -55,7 +55,7 @@ impl VulkanData {
             scopeguard::guard(tese_sm, |sm| {
                 log::warn!("tessellation evaluation shader scopeguard: destroying shader module");
                 unsafe {
-                    vulkan_base.device.destroy_shader_module(sm, None);
+                    device.destroy_shader_module(sm, None);
                 }
             })
         };
@@ -71,7 +71,7 @@ impl VulkanData {
             scopeguard::guard(tesc_sm, |sm| {
                 log::warn!("tessellation control shader scopeguard: destroying shader module");
                 unsafe {
-                    vulkan_base.device.destroy_shader_module(sm, None);
+                    device.destroy_shader_module(sm, None);
                 }
             })
         };
@@ -87,77 +87,83 @@ impl VulkanData {
             scopeguard::guard(fragment_sm, |sm| {
                 log::warn!("fragment shader scopeguard: destroying shader module");
                 unsafe {
-                    vulkan_base.device.destroy_shader_module(sm, None);
+                    device.destroy_shader_module(sm, None);
                 }
             })
         };
 
         let teapot_data = teapot_data::TeapotData::new();
 
-        let control_points_mem_buffer = vulkan::create_gpu_buffer_init(
-            &vulkan_base.device,
-            *allocator_rc.borrow_mut(),
-            &vulkan_base.debug_utils_loader,
-            vulkan_base.queue_family,
-            vulkan_base.queue,
-            teapot_data.get_control_points_slice(),
-            vk::BufferUsageFlags::STORAGE_BUFFER,
-            vk::AccessFlags::SHADER_READ,
-            vk::PipelineStageFlags::VERTEX_SHADER,
-            "control points buffer",
-        )?;
+        let control_points_mem_buffer_sg = {
+            let control_points_mem_buffer = vulkan::create_gpu_buffer_init(
+                &vulkan_base.device,
+                *allocator_rc.borrow_mut(),
+                &vulkan_base.debug_utils_loader,
+                vulkan_base.queue_family,
+                vulkan_base.queue,
+                teapot_data.get_control_points_slice(),
+                vk::BufferUsageFlags::STORAGE_BUFFER,
+                vk::AccessFlags::SHADER_READ,
+                vk::PipelineStageFlags::VERTEX_SHADER,
+                "control points buffer",
+            )?;
 
-        let control_points_mem_buffer_sg = guard(control_points_mem_buffer, |mem_buffer| {
-            log::info!("something went wrong, destroying control points buffer");
-            unsafe {
-                device.destroy_buffer(mem_buffer.buffer, None);
-            }
-            let _ = allocator_rc.borrow_mut().free(mem_buffer.allocation);
-        });
+            guard(control_points_mem_buffer, |mem_buffer| {
+                log::info!("something went wrong, destroying control points buffer");
+                unsafe {
+                    device.destroy_buffer(mem_buffer.buffer, None);
+                }
+                let _ = allocator_rc.borrow_mut().free(mem_buffer.allocation);
+            })
+        };
 
-        let patches_mem_buffer = vulkan::create_gpu_buffer_init(
-            &vulkan_base.device,
-            *allocator_rc.borrow_mut(),
-            &vulkan_base.debug_utils_loader,
-            vulkan_base.queue_family,
-            vulkan_base.queue,
-            teapot_data.get_patches_slice(),
-            vk::BufferUsageFlags::INDEX_BUFFER,
-            vk::AccessFlags::INDEX_READ,
-            vk::PipelineStageFlags::VERTEX_INPUT,
-            "patches buffer",
-        )?;
+        let patches_mem_buffer_sg = {
+            let patches_mem_buffer = vulkan::create_gpu_buffer_init(
+                &vulkan_base.device,
+                *allocator_rc.borrow_mut(),
+                &vulkan_base.debug_utils_loader,
+                vulkan_base.queue_family,
+                vulkan_base.queue,
+                teapot_data.get_patches_slice(),
+                vk::BufferUsageFlags::INDEX_BUFFER,
+                vk::AccessFlags::INDEX_READ,
+                vk::PipelineStageFlags::VERTEX_INPUT,
+                "patches buffer",
+            )?;
 
-        let patches_mem_buffer_sg = guard(patches_mem_buffer, |mem_buffer| {
-            log::info!("something went wrong, destroying patches buffer");
-            unsafe {
-                device.destroy_buffer(mem_buffer.buffer, None);
-            }
-            let _ = allocator_rc.borrow_mut().free(mem_buffer.allocation);
-        });
+            guard(patches_mem_buffer, |mem_buffer| {
+                log::info!("something went wrong, destroying patches buffer");
+                unsafe {
+                    device.destroy_buffer(mem_buffer.buffer, None);
+                }
+                let _ = allocator_rc.borrow_mut().free(mem_buffer.allocation);
+            })
+        };
 
         let patch_point_count = teapot_data.get_patch_point_count();
 
-        let instances_mem_buffer = vulkan::create_gpu_buffer_init(
-            &vulkan_base.device,
-            *allocator_rc.borrow_mut(),
-            &vulkan_base.debug_utils_loader,
-            vulkan_base.queue_family,
-            vulkan_base.queue,
-            teapot_data.get_instances_slice(),
-            vk::BufferUsageFlags::STORAGE_BUFFER,
-            vk::AccessFlags::SHADER_READ,
-            vk::PipelineStageFlags::TESSELLATION_EVALUATION_SHADER,
-            "instances buffer",
-        )?;
+        let instances_mem_buffer_sg = {
+            let instances_mem_buffer = vulkan::create_gpu_buffer_init(
+                &vulkan_base.device,
+                *allocator_rc.borrow_mut(),
+                &vulkan_base.debug_utils_loader,
+                vulkan_base.queue_family,
+                vulkan_base.queue,
+                teapot_data.get_instances_slice(),
+                vk::BufferUsageFlags::STORAGE_BUFFER,
+                vk::AccessFlags::SHADER_READ,
+                vk::PipelineStageFlags::TESSELLATION_EVALUATION_SHADER,
+                "instances buffer",
+            )?;
 
-        let instances_mem_buffer_sg = guard(instances_mem_buffer, |mem_buffer| {
-            log::info!("something went wrong, destroying instances buffer");
-            unsafe {
-                device.destroy_buffer(mem_buffer.buffer, None);
-            }
-            let _ = allocator_rc.borrow_mut().free(mem_buffer.allocation);
-        });
+            guard(instances_mem_buffer, |mem_buffer| {
+                log::info!("something went wrong, destroying instances buffer");
+                unsafe {
+                    device.destroy_buffer(mem_buffer.buffer, None);
+                }
+                let _ = allocator_rc.borrow_mut().free(mem_buffer.allocation);
+            })
+        };
 
         let mut uniform_mem_buffer_sgs =
             Vec::with_capacity(crate::CONCURRENT_RESOURCE_COUNT as usize);
@@ -199,7 +205,7 @@ impl VulkanData {
         })
     }
 
-    pub fn clean(self, vulkan_base: &VulkanBase) {
+    pub fn clean(self, vulkan_base: &mut VulkanBase) {
         log::info!("cleaning vulkan data");
 
         unsafe {
