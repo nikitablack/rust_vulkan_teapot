@@ -34,17 +34,16 @@ fn main() {
         .unwrap();
 
     // vulkan base
-    let enable_debug_utils = true;
     let device_extensions = vec![];
-    let instance_extensions =
-        vulkan::get_required_instance_extensions(&window, enable_debug_utils).unwrap();
+    let instance_extensions = match vulkan::get_required_instance_extensions(&window) {
+        Ok(instance_extensions) => instance_extensions,
+        Err(msg) => {
+            log::error!("{}", msg);
+            panic!("{}", msg);
+        }
+    };
 
-    let mut vk_base = match VulkanBase::new(
-        &window,
-        &instance_extensions,
-        &device_extensions,
-        enable_debug_utils,
-    ) {
+    let mut vk_base = match VulkanBase::new(&window, &instance_extensions, &device_extensions) {
         Ok(vk_base) => Some(vk_base),
         Err(msg) => {
             log::error!("{}", msg);
@@ -53,11 +52,13 @@ fn main() {
     };
 
     // vulkan data
-    let mut vk_data = match VulkanData::new(vk_base.as_mut().unwrap()) {
+    let mut vk_data = match VulkanData::new(&vk_base.as_ref().unwrap()) {
         Ok(vk_data) => Some(vk_data),
         Err(msg) => {
             vk_base.unwrap().clean();
             log::error!("{}", msg);
+            let vk_base = vk_base.unwrap();
+            vk_base.clean();
             panic!("{}", msg);
         }
     };
@@ -81,7 +82,7 @@ fn main() {
 
                 log::info!("exit requested");
 
-                let mut vk_base = vk_base.take().unwrap();
+                let vk_base = vk_base.take().unwrap();
                 let vk_data = vk_data.take().unwrap();
 
                 unsafe {

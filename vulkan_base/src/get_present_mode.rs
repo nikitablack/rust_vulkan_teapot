@@ -6,6 +6,8 @@ pub fn get_present_mode(
     surface_loader: &khr::Surface,
     surface: vk::SurfaceKHR,
 ) -> Result<vk::PresentModeKHR, String> {
+    log::info!("getting present mode");
+
     let modes = match unsafe {
         surface_loader.get_physical_device_surface_present_modes(physical_device, surface)
     } {

@@ -4,6 +4,8 @@ pub fn get_depth_format(
     instance: &ash::Instance,
     physical_device: vk::PhysicalDevice,
 ) -> Result<vk::Format, String> {
+    log::info!("getting depth format");
+
     let format_candidates = [
         vk::Format::D24_UNORM_S8_UINT,
         vk::Format::D32_SFLOAT_S8_UINT,

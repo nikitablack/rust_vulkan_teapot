@@ -39,7 +39,7 @@ pub struct VulkanBase {
     pub entry: ash::Entry,
     pub instance: ash::Instance,
     pub surface_loader: khr::Surface,
-    pub debug_utils_loader: Option<ash::extensions::ext::DebugUtils>,
+    pub debug_utils_loader: ash::extensions::ext::DebugUtils,
     pub surface: vk::SurfaceKHR,
     pub physical_device: vk::PhysicalDevice,
     pub physical_device_properties: vk::PhysicalDeviceProperties,
@@ -57,7 +57,6 @@ impl VulkanBase {
         window: &winit::window::Window,
         required_instance_extensions: &Vec<&'a std::ffi::CStr>,
         required_device_extensions: &Vec<&'b std::ffi::CStr>,
-        enable_debug_utils: bool,
     ) -> Result<Self, String> {
         let entry = create_entry()?;
         check_instance_version(&entry)?;
@@ -71,8 +70,7 @@ impl VulkanBase {
             }
         });
 
-        let debug_utils_loader =
-            create_debug_utils_loader(enable_debug_utils, &entry, &instance_sg);
+        let debug_utils_loader = create_debug_utils_loader(&entry, &instance_sg);
         let surface_loader = create_surface_loader(&entry, &instance_sg);
 
         let surface = create_surface(&entry, &instance_sg, window)?;

@@ -1,6 +1,8 @@
 use ash::vk;
 
 pub fn check_instance_version(entry: &ash::Entry) -> Result<(), String> {
+    log::info!("checking instance version");
+
     let api_version = match entry.try_enumerate_instance_version() {
         Ok(result) => match result {
             Some(version) => version,

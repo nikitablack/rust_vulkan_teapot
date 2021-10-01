@@ -4,6 +4,8 @@ pub fn create_instance<'a>(
     entry: &ash::Entry,
     instance_extensions: &Vec<&'a std::ffi::CStr>,
 ) -> Result<ash::Instance, String> {
+    log::info!("creating instance");
+
     let extension_names_raw = instance_extensions
         .iter()
         .map(|ext| ext.as_ptr())

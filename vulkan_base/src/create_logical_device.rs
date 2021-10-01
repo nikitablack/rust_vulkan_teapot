@@ -6,6 +6,8 @@ pub fn create_logical_device<'a>(
     queue_family: u32,
     device_extensions: &Vec<&'a std::ffi::CStr>,
 ) -> Result<ash::Device, String> {
+    log::info!("creating logical device");
+
     let queue_indices = [queue_family];
 
     let mut queue_priorities = Vec::new();

@@ -7,6 +7,8 @@ pub fn get_queue_family(
     surface_loader: &khr::Surface,
     surface: vk::SurfaceKHR,
 ) -> Result<u32, String> {
+    log::info!("getting queue family");
+
     let props = unsafe { instance.get_physical_device_queue_family_properties(physical_device) };
 
     for (ind, p) in props.iter().enumerate() {
