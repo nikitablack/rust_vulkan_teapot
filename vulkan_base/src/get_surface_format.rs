@@ -6,6 +6,8 @@ pub fn get_surface_format(
     surface_loader: &khr::Surface,
     surface: vk::SurfaceKHR,
 ) -> Result<vk::SurfaceFormatKHR, String> {
+    log::info!("getting surface format");
+
     let formats = match unsafe {
         surface_loader.get_physical_device_surface_formats(physical_device, surface)
     } {

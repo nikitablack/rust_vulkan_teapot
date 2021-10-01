@@ -1,15 +1,9 @@
 use ash::extensions::ext;
 
-pub fn create_debug_utils_loader(
-    enable_debug_utils: bool,
-    entry: &ash::Entry,
-    instance: &ash::Instance,
-) -> Option<ext::DebugUtils> {
-    match enable_debug_utils {
-        true => {
-            log::info!("debug utils loader created");
-            Some(ext::DebugUtils::new(&entry, &instance))
-        }
-        false => None,
-    }
+pub fn create_debug_utils_loader(entry: &ash::Entry, instance: &ash::Instance) -> ext::DebugUtils {
+    let debug_utils_loader = ext::DebugUtils::new(&entry, &instance);
+
+    log::info!("debug utils loader created");
+
+    debug_utils_loader
 }

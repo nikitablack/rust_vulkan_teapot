@@ -5,6 +5,8 @@ pub fn create_surface(
     instance: &ash::Instance,
     window: &winit::window::Window,
 ) -> Result<vk::SurfaceKHR, String> {
+    log::info!("creating surface");
+
     let surface = unsafe {
         ash_window::create_surface(&entry, &instance, window, None)
             .map_err(|_| String::from("failed to create surface"))?

@@ -5,7 +5,7 @@ pub fn check_required_instance_extensions<'a>(
     required_instance_extensions: &Vec<&'a std::ffi::CStr>,
 ) -> Result<(), String> {
     log::info!(
-        "required instance extensions: {:?}",
+        "checking required instance extensions: {:?}",
         required_instance_extensions
     );
 

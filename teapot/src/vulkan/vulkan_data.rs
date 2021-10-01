@@ -1,4 +1,3 @@
-use crate::vulkan;
 use ash::vk;
 use vulkan_base::VulkanBase;
 
@@ -11,54 +10,69 @@ pub struct VulkanData {
 
 impl VulkanData {
     pub fn new(vulkan_base: &VulkanBase) -> Result<Self, String> {
-        let vertex_sm = vulkan::create_shader_module(
-            vulkan_base,
-            std::path::Path::new("shaders/shader.vert.spv"),
-            "vertex shader",
-        )?;
-        let vertex_sm_sg = scopeguard::guard(vertex_sm, |sm| {
-            log::info!("something went wrong, destroying vertex shader module");
-            unsafe {
-                vulkan_base.device.destroy_shader_module(sm, None);
-            }
-        });
+        let vertex_sm_sg = {
+            let vertex_sm = vulkan_utils::create_shader_module(
+                &vulkan_base.device,
+                std::path::Path::new("shaders/shader.vert.spv"),
+                &vulkan_base.debug_utils_loader,
+                "vertex shader",
+            )?;
 
-        let tese_sm = vulkan::create_shader_module(
-            vulkan_base,
-            std::path::Path::new("shaders/shader.tese.spv"),
-            "tesselation evaluation shader",
-        )?;
-        let tese_sm_sg = scopeguard::guard(tese_sm, |sm| {
-            log::info!("something went wrong, destroying tessellation evaluation shader module");
-            unsafe {
-                vulkan_base.device.destroy_shader_module(sm, None);
-            }
-        });
+            scopeguard::guard(vertex_sm, |sm| {
+                log::warn!("vertex shader scopeguard: destroying shader module");
+                unsafe {
+                    vulkan_base.device.destroy_shader_module(sm, None);
+                }
+            })
+        };
 
-        let tesc_sm = vulkan::create_shader_module(
-            vulkan_base,
-            std::path::Path::new("shaders/shader.tesc.spv"),
-            "tesselation control shader",
-        )?;
-        let tesc_sm_sg = scopeguard::guard(tesc_sm, |sm| {
-            log::info!("something went wrong, destroying tessellation control shader module");
-            unsafe {
-                vulkan_base.device.destroy_shader_module(sm, None);
-            }
-        });
+        let tese_sm_sg = {
+            let tese_sm = vulkan_utils::create_shader_module(
+                &vulkan_base.device,
+                std::path::Path::new("shaders/shader.tese.spv"),
+                &vulkan_base.debug_utils_loader,
+                "tessellation evaluation shader",
+            )?;
 
-        let fragment_sm = vulkan::create_shader_module(
-            vulkan_base,
-            std::path::Path::new("shaders/shader.frag.spv"),
-            "fragment shader",
-        )?;
+            scopeguard::guard(tese_sm, |sm| {
+                log::warn!("tessellation evaluation shader scopeguard: destroying shader module");
+                unsafe {
+                    vulkan_base.device.destroy_shader_module(sm, None);
+                }
+            })
+        };
 
-        let fragment_sm_sg = scopeguard::guard(fragment_sm, |sm| {
-            log::info!("something went wrong, destroying fragment shader module");
-            unsafe {
-                vulkan_base.device.destroy_shader_module(sm, None);
-            }
-        });
+        let tesc_sm_sg = {
+            let tesc_sm = vulkan_utils::create_shader_module(
+                &vulkan_base.device,
+                std::path::Path::new("shaders/shader.tesc.spv"),
+                &vulkan_base.debug_utils_loader,
+                "tessellation control shader",
+            )?;
+
+            scopeguard::guard(tesc_sm, |sm| {
+                log::warn!("tessellation control shader scopeguard: destroying shader module");
+                unsafe {
+                    vulkan_base.device.destroy_shader_module(sm, None);
+                }
+            })
+        };
+
+        let fragment_sm_sg = {
+            let fragment_sm = vulkan_utils::create_shader_module(
+                &vulkan_base.device,
+                std::path::Path::new("shaders/shader.frag.spv"),
+                &vulkan_base.debug_utils_loader,
+                "fragment shader",
+            )?;
+
+            scopeguard::guard(fragment_sm, |sm| {
+                log::warn!("fragment shader scopeguard: destroying shader module");
+                unsafe {
+                    vulkan_base.device.destroy_shader_module(sm, None);
+                }
+            })
+        };
 
         Ok(VulkanData {
             vertex_shader_module: scopeguard::ScopeGuard::into_inner(vertex_sm_sg),
@@ -68,7 +82,7 @@ impl VulkanData {
         })
     }
 
-    pub fn clean(&self, vulkan_base: &VulkanBase) {
+    pub fn clean(self, vulkan_base: &VulkanBase) {
         log::info!("cleaning vulkan data");
 
         unsafe {
