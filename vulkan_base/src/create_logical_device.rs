@@ -1,4 +1,3 @@
-use ash::version::InstanceV1_0;
 use ash::vk;
 
 pub fn create_logical_device<'a>(
@@ -7,6 +6,8 @@ pub fn create_logical_device<'a>(
     queue_family: u32,
     device_extensions: &Vec<&'a std::ffi::CStr>,
 ) -> Result<ash::Device, String> {
+    log::info!("creating logical device");
+
     let queue_indices = [queue_family];
 
     let mut queue_priorities = Vec::new();
@@ -40,9 +41,13 @@ pub fn create_logical_device<'a>(
         .enabled_extension_names(&device_extensions_raw)
         .enabled_features(&features);
 
-    unsafe {
+    let device = unsafe {
         instance
             .create_device(physical_device, &create_info, None)
-            .map_err(|_| String::from("failed to create device"))
-    }
+            .map_err(|_| String::from("failed to create device"))?
+    };
+
+    log::info!("logical device created");
+
+    return Ok(device);
 }
