@@ -19,7 +19,7 @@ impl VulkanData {
             )?;
 
             scopeguard::guard(vertex_sm, |sm| {
-                log::warn!("vertex shader scopeguard: destroying shader module");
+                log::warn!("vertex shader scopeguard");
                 unsafe {
                     vulkan_base.device.destroy_shader_module(sm, None);
                 }
@@ -35,7 +35,7 @@ impl VulkanData {
             )?;
 
             scopeguard::guard(tese_sm, |sm| {
-                log::warn!("tessellation evaluation shader scopeguard: destroying shader module");
+                log::warn!("tessellation evaluation shader scopeguard");
                 unsafe {
                     vulkan_base.device.destroy_shader_module(sm, None);
                 }
@@ -51,7 +51,7 @@ impl VulkanData {
             )?;
 
             scopeguard::guard(tesc_sm, |sm| {
-                log::warn!("tessellation control shader scopeguard: destroying shader module");
+                log::warn!("tessellation control shader scopeguard");
                 unsafe {
                     vulkan_base.device.destroy_shader_module(sm, None);
                 }
@@ -67,7 +67,7 @@ impl VulkanData {
             )?;
 
             scopeguard::guard(fragment_sm, |sm| {
-                log::warn!("fragment shader scopeguard: destroying shader module");
+                log::warn!("fragment shader scopeguard");
                 unsafe {
                     vulkan_base.device.destroy_shader_module(sm, None);
                 }
