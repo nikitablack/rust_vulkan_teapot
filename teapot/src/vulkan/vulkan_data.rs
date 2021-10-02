@@ -37,7 +37,7 @@ impl VulkanData {
             )?;
 
             scopeguard::guard(vertex_sm, |sm| {
-                log::warn!("vertex shader scopeguard: destroying shader module");
+                log::warn!("vertex shader scopeguard");
                 unsafe {
                     device.destroy_shader_module(sm, None);
                 }
@@ -53,7 +53,7 @@ impl VulkanData {
             )?;
 
             scopeguard::guard(tese_sm, |sm| {
-                log::warn!("tessellation evaluation shader scopeguard: destroying shader module");
+                log::warn!("tessellation evaluation shader scopeguard");
                 unsafe {
                     device.destroy_shader_module(sm, None);
                 }
@@ -69,7 +69,7 @@ impl VulkanData {
             )?;
 
             scopeguard::guard(tesc_sm, |sm| {
-                log::warn!("tessellation control shader scopeguard: destroying shader module");
+                log::warn!("tessellation control shader scopeguard");
                 unsafe {
                     device.destroy_shader_module(sm, None);
                 }
@@ -85,7 +85,7 @@ impl VulkanData {
             )?;
 
             scopeguard::guard(fragment_sm, |sm| {
-                log::warn!("fragment shader scopeguard: destroying shader module");
+                log::warn!("fragment shader scopeguard");
                 unsafe {
                     device.destroy_shader_module(sm, None);
                 }
@@ -109,7 +109,7 @@ impl VulkanData {
             )?;
 
             guard(control_points_mem_buffer, |mem_buffer| {
-                log::warn!("control points buffer scopeguard: destroying buffer and memory");
+                log::warn!("control points buffer scopeguard");
                 unsafe {
                     device.destroy_buffer(mem_buffer.buffer, None);
                 }
@@ -132,7 +132,7 @@ impl VulkanData {
             )?;
 
             guard(patches_mem_buffer, |mem_buffer| {
-                log::warn!("patches buffer scopeguard: destroying buffer and memory");
+                log::warn!("patches buffer scopeguard");
                 unsafe {
                     device.destroy_buffer(mem_buffer.buffer, None);
                 }
@@ -157,7 +157,7 @@ impl VulkanData {
             )?;
 
             guard(instances_mem_buffer, |mem_buffer| {
-                log::warn!("instances buffer scopeguard: destroying buffer and memory");
+                log::warn!("instances buffer scopeguard");
                 unsafe {
                     device.destroy_buffer(mem_buffer.buffer, None);
                 }
@@ -180,10 +180,7 @@ impl VulkanData {
 
             let allocator_rc = &allocator_rc;
             let uniform_mem_buffer_sg = guard(mem_buffer, move |mem_buffer| {
-                log::warn!(
-                    "uniform buffer scopeguard {}: destroying buffer and memory",
-                    i,
-                );
+                log::warn!("uniform buffer {} scopeguard", i);
                 unsafe {
                     device.destroy_buffer(mem_buffer.buffer, None);
                 }
