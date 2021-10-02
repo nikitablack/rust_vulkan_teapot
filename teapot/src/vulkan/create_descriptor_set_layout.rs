@@ -1,10 +1,11 @@
-use crate::vulkan;
-use ash::version::DeviceV1_0;
 use ash::vk;
 
 pub fn create_descriptor_set_layout(
-    vulkan_base: &vulkan_base::VulkanBase,
+    device: &ash::Device,
+    debug_utils_loader: &ash::extensions::ext::DebugUtils,
 ) -> Result<vk::DescriptorSetLayout, String> {
+    log::info!("creating descriptor set layout");
+
     let control_points_binding = vk::DescriptorSetLayoutBinding::builder()
         .binding(0)
         .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
@@ -32,18 +33,19 @@ pub fn create_descriptor_set_layout(
         .build();
 
     let descriptor_set_layout = unsafe {
-        vulkan_base
-            .device
+        device
             .create_descriptor_set_layout(&create_info, None)
             .map_err(|_| String::from("failed to create descriptor set layout"))?
     };
 
-    vulkan::set_debug_utils_object_name(
-        &vulkan_base.debug_utils_loader,
-        vulkan_base.device.handle(),
+    vulkan_utils::set_debug_utils_object_name(
+        debug_utils_loader,
+        device.handle(),
         descriptor_set_layout,
         "descriptor set layout",
     );
+
+    log::info!("descriptor set layout created");
 
     Ok(descriptor_set_layout)
 }

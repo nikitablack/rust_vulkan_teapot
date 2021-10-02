@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 
 use crate::teapot_data;
+use crate::vulkan;
 use ash::vk;
 use scopeguard::{guard, ScopeGuard};
 use vulkan_base::VulkanBase;
@@ -108,7 +109,7 @@ impl VulkanData {
             )?;
 
             guard(control_points_mem_buffer, |mem_buffer| {
-                log::warn!("control points scopeguard: destroying buffer and memory");
+                log::warn!("control points buffer scopeguard: destroying buffer and memory");
                 unsafe {
                     device.destroy_buffer(mem_buffer.buffer, None);
                 }
@@ -131,7 +132,7 @@ impl VulkanData {
             )?;
 
             guard(patches_mem_buffer, |mem_buffer| {
-                log::warn!("patches scopeguard: destroying buffer and memory");
+                log::warn!("patches buffer scopeguard: destroying buffer and memory");
                 unsafe {
                     device.destroy_buffer(mem_buffer.buffer, None);
                 }
@@ -156,7 +157,7 @@ impl VulkanData {
             )?;
 
             guard(instances_mem_buffer, |mem_buffer| {
-                log::warn!("instances scopeguard: destroying buffer and memory");
+                log::warn!("instances buffer scopeguard: destroying buffer and memory");
                 unsafe {
                     device.destroy_buffer(mem_buffer.buffer, None);
                 }
@@ -192,19 +193,78 @@ impl VulkanData {
             uniform_mem_buffer_sgs.push(uniform_mem_buffer_sg);
         }
 
-        let descriptor_set_layout = vulkan::create_descriptor_set_layout(vulkan_base)?;
-        let pipeline_layout =
-            vulkan::create_pipeline_layout(vulkan_base, vulkan_data.descriptor_set_layout)?;
-        let render_pass = vulkan::create_render_pass(vulkan_base)?;
-        let (solid_pipeline, wireframe_pipeline) = vulkan::create_pipelines(
-            vulkan_base,
-            vulkan_data.vertex_shader_module,
-            vulkan_data.tesc_shader_module,
-            vulkan_data.tese_shader_module,
-            vulkan_data.fragment_shader_module,
-            vulkan_data.pipeline_layout,
-            vulkan_data.render_pass,
-        )?;
+        let descriptor_set_layout_sg = {
+            let descriptor_set_layout = vulkan::create_descriptor_set_layout(
+                &vulkan_base.device,
+                &vulkan_base.debug_utils_loader,
+            )?;
+
+            guard(descriptor_set_layout, |layout| {
+                log::warn!("descriptor set layout scopeguard");
+                unsafe {
+                    device.destroy_descriptor_set_layout(layout, None);
+                }
+            })
+        };
+
+        let pipeline_layout_sg = {
+            let pipeline_layout = vulkan::create_pipeline_layout(
+                &vulkan_base.device,
+                *descriptor_set_layout_sg,
+                &vulkan_base.debug_utils_loader,
+            )?;
+
+            guard(pipeline_layout, |layout| {
+                log::warn!("pipeline layout scopeguard");
+                unsafe {
+                    device.destroy_pipeline_layout(layout, None);
+                }
+            })
+        };
+
+        let render_pass_sg = {
+            let render_pass = vulkan::create_render_pass(
+                &vulkan_base.device,
+                vulkan_base.surface_format.format,
+                &vulkan_base.debug_utils_loader,
+            )?;
+
+            guard(render_pass, |render_pass| {
+                log::warn!("render pass scopeguard");
+                unsafe {
+                    device.destroy_render_pass(render_pass, None);
+                }
+            })
+        };
+
+        let (solid_pipeline_sg, wireframe_pipeline_sg) = {
+            let (solid_pipeline, wireframe_pipeline) = vulkan::create_pipelines(
+                &vulkan_base.device,
+                *vertex_sm_sg,
+                *tesc_sm_sg,
+                *tese_sm_sg,
+                *fragment_sm_sg,
+                *pipeline_layout_sg,
+                *render_pass_sg,
+                &vulkan_base.debug_utils_loader,
+            )?;
+
+            let sg_1 = guard(solid_pipeline, |pipeline| {
+                log::warn!("solid pipeline scopeguard");
+                unsafe {
+                    device.destroy_pipeline(pipeline, None);
+                }
+            });
+
+            let sg_2 = guard(wireframe_pipeline, |pipeline| {
+                log::warn!("wireframe pipeline scopeguard");
+                unsafe {
+                    device.destroy_pipeline(pipeline, None);
+                }
+            });
+
+            (sg_1, sg_2)
+        };
 
         Ok(VulkanData {
             vertex_shader_module: ScopeGuard::into_inner(vertex_sm_sg),
@@ -219,6 +279,11 @@ impl VulkanData {
                 .into_iter()
                 .map(|sg| ScopeGuard::into_inner(sg))
                 .collect(),
+            descriptor_set_layout: ScopeGuard::into_inner(descriptor_set_layout_sg),
+            pipeline_layout: ScopeGuard::into_inner(pipeline_layout_sg),
+            render_pass: ScopeGuard::into_inner(render_pass_sg),
+            solid_pipeline: ScopeGuard::into_inner(solid_pipeline_sg),
+            wireframe_pipeline: ScopeGuard::into_inner(wireframe_pipeline_sg),
         })
     }
 
@@ -270,92 +335,3 @@ impl VulkanData {
         }
     }
 }
-/*
-fn new_internal(vulkan_data: &mut VulkanData, vulkan_base: &VulkanBase) -> Result<(), String> {
-    vulkan_data.vertex_shader_module = vulkan::create_shader_module(
-        vulkan_base,
-        std::path::Path::new("shaders/shader.vert.spv"),
-        "vertex shader",
-    )?;
-
-    vulkan_data.tese_shader_module = vulkan::create_shader_module(
-        vulkan_base,
-        std::path::Path::new("shaders/shader.tese.spv"),
-        "tesselation evaluation shader",
-    )?;
-
-    vulkan_data.tesc_shader_module = vulkan::create_shader_module(
-        vulkan_base,
-        std::path::Path::new("shaders/shader.tesc.spv"),
-        "tesselation control shader",
-    )?;
-
-    vulkan_data.fragment_shader_module = vulkan::create_shader_module(
-        vulkan_base,
-        std::path::Path::new("shaders/shader.frag.spv"),
-        "fragment shader",
-    )?;
-
-    let teapot_data = teapot_data::TeapotData::new();
-
-    vulkan_data.control_points_mem_buffer = vulkan::create_buffer_init(
-        vulkan_base,
-        teapot_data.get_control_points_slice(),
-        vk::BufferUsageFlags::STORAGE_BUFFER,
-        vk::AccessFlags::SHADER_READ,
-        vk::PipelineStageFlags::VERTEX_SHADER,
-        "control points buffer",
-    )?;
-
-    vulkan_data.patches_mem_buffer = vulkan::create_buffer_init(
-        vulkan_base,
-        teapot_data.get_patches_slice(),
-        vk::BufferUsageFlags::INDEX_BUFFER,
-        vk::AccessFlags::INDEX_READ,
-        vk::PipelineStageFlags::VERTEX_INPUT,
-        "patches buffer",
-    )?;
-
-    vulkan_data.patch_point_count = teapot_data.get_patch_point_count();
-
-    vulkan_data.instances_mem_buffer = vulkan::create_buffer_init(
-        vulkan_base,
-        teapot_data.get_instances_slice(),
-        vk::BufferUsageFlags::STORAGE_BUFFER,
-        vk::AccessFlags::SHADER_READ,
-        vk::PipelineStageFlags::TESSELLATION_EVALUATION_SHADER,
-        "instances buffer",
-    )?;
-
-    for i in 0..crate::CONCURRENT_RESOURCE_COUNT {
-        let buffer = vulkan::create_buffer(
-            vulkan_base,
-            (16 * std::mem::size_of::<f32>()) as vk::DeviceSize,
-            vk::BufferUsageFlags::UNIFORM_BUFFER,
-            vk_mem::MemoryUsage::CpuToGpu,
-            vk_mem::AllocationCreateFlags::MAPPED,
-            &format!("uniform buffer {}", i),
-        )?;
-
-        vulkan_data.uniform_mem_buffers.push(buffer);
-    }
-
-    vulkan_data.descriptor_set_layout = vulkan::create_descriptor_set_layout(vulkan_base)?;
-    vulkan_data.pipeline_layout =
-        vulkan::create_pipeline_layout(vulkan_base, vulkan_data.descriptor_set_layout)?;
-    vulkan_data.render_pass = vulkan::create_render_pass(vulkan_base)?;
-    let (solid_pipeline, wireframe_pipeline) = vulkan::create_pipelines(
-        vulkan_base,
-        vulkan_data.vertex_shader_module,
-        vulkan_data.tesc_shader_module,
-        vulkan_data.tese_shader_module,
-        vulkan_data.fragment_shader_module,
-        vulkan_data.pipeline_layout,
-        vulkan_data.render_pass,
-    )?;
-    vulkan_data.solid_pipeline = solid_pipeline;
-    vulkan_data.wireframe_pipeline = wireframe_pipeline;
-
-    Ok(())
-}
-*/
