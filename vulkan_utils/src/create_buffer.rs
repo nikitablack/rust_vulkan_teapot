@@ -27,7 +27,7 @@ pub fn create_buffer(
     };
 
     let buffer_sg = scopeguard::guard(buffer, |buffer| {
-        log::info!("{}: something went wrong, destroying", object_name);
+        log::warn!("{} scopeguard", object_name);
         unsafe {
             device.destroy_buffer(buffer, None);
         }
@@ -52,7 +52,7 @@ pub fn create_buffer(
         .map_err(|_| format!("{}: failed to allocate memory", object_name))?;
 
     let allocation_sg = scopeguard::guard(allocation, |allocation| {
-        log::info!("{}: something went wrong, freeing allocation", object_name);
+        log::warn!("{} allocation scopeguard", object_name);
         let _ = allocator.free(allocation);
     });
 
@@ -118,7 +118,7 @@ pub fn create_gpu_buffer_init(
     )?;
 
     let staging_buffer_sg = scopeguard::guard(staging_mem_buffer.buffer, |buffer| {
-        log::info!("{} staging: something went wrong, destroying", object_name);
+        log::warn!("{} staging scopeguard", object_name);
         unsafe {
             device.destroy_buffer(buffer, None);
         }
@@ -126,10 +126,7 @@ pub fn create_gpu_buffer_init(
 
     let mut staging_allocation_sg =
         scopeguard::guard(staging_mem_buffer.allocation, |allocation| {
-            log::info!(
-                "{} stagingsomething went wrong, freeing memory",
-                object_name
-            );
+            log::warn!("{} staging allocation scopeguard", object_name);
             let _ = allocator_rc.borrow_mut().free(allocation);
         });
 
@@ -150,24 +147,21 @@ pub fn create_gpu_buffer_init(
     )?;
 
     let gpu_buffer_sg = scopeguard::guard(gpu_mem_buffer.buffer, |buffer| {
-        log::info!("{}: something went wrong, destroying", object_name);
+        log::warn!("{} scopeguard", object_name);
         unsafe {
             device.destroy_buffer(buffer, None);
         }
     });
 
     let gpu_allocation_sg = scopeguard::guard(gpu_mem_buffer.allocation, |allocation| {
-        log::info!("{}: something went wrong, freeing memory", object_name);
+        log::warn!("{} allocation scopeguard", object_name);
         let _ = allocator_rc.borrow_mut().free(allocation);
     });
 
     // command pool
     let command_pool = create_command_pool(device, queue_family, object_name)?;
     let command_pool_sg = scopeguard::guard(command_pool, |command_pool| {
-        log::info!(
-            "{}: something went wrong, destroying command pool",
-            object_name
-        );
+        log::warn!("{} command pool scopeguard", object_name);
         unsafe {
             device.destroy_command_pool(command_pool, None);
         }
