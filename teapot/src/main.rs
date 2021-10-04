@@ -1,7 +1,6 @@
 mod teapot_data;
 mod vulkan;
 
-use ash::version::DeviceV1_0;
 use vulkan::VulkanData;
 use vulkan_base::VulkanBase;
 
@@ -35,18 +34,11 @@ fn main() {
         .unwrap();
 
     // vulkan base
-    let enable_debug_utils = true;
     let device_extensions = vec![ash::extensions::khr::Swapchain::name()];
-    let instance_extensions =
-        vulkan::get_required_instance_extensions(&window, enable_debug_utils).unwrap();
+    let instance_extensions = vulkan::get_required_instance_extensions(&window).unwrap();
 
-    let mut vk_base = match VulkanBase::new(
-        &window,
-        &instance_extensions,
-        &device_extensions,
-        enable_debug_utils,
-    ) {
-        Ok(vk_base) => vk_base,
+    let mut vk_base = match VulkanBase::new(&window, &instance_extensions, &device_extensions) {
+        Ok(vk_base) => Some(vk_base),
         Err(msg) => {
             log::error!("{}", msg);
             panic!("{}", msg);
@@ -54,10 +46,12 @@ fn main() {
     };
 
     // vulkan data
-    let mut vk_data = match VulkanData::new(&vk_base) {
-        Ok(vk_data) => vk_data,
+    let mut vk_data = match VulkanData::new(vk_base.as_mut().unwrap()) {
+        Ok(vk_data) => Some(vk_data),
         Err(msg) => {
             log::error!("{}", msg);
+            let vk_base = vk_base.unwrap();
+            vk_base.clean();
             panic!("{}", msg);
         }
     };
@@ -81,11 +75,14 @@ fn main() {
 
                 log::info!("exit requested");
 
+                let mut vk_base = vk_base.take().unwrap();
+                let vk_data = vk_data.take().unwrap();
+
                 unsafe {
                     let _ = vk_base.device.device_wait_idle();
                 }
 
-                vk_data.clean(&vk_base);
+                vk_data.clean(&mut vk_base);
                 vk_base.clean();
 
                 app_exit = true;
@@ -100,6 +97,9 @@ fn main() {
                 if window.inner_size().width == 0 && window.inner_size().height == 0 {
                     return;
                 }
+
+                let vk_base = vk_base.as_ref().unwrap();
+                let vk_data = vk_data.as_mut().unwrap();
 
                 if vk_data.should_resize {
                     vk_data.should_resize = false;

@@ -1,13 +1,17 @@
-use crate::vulkan;
-use ash::version::DeviceV1_0;
 use ash::vk;
 
-pub fn create_render_pass(vulkan_base: &vulkan_base::VulkanBase) -> Result<vk::RenderPass, String> {
+pub fn create_render_pass(
+    device: &ash::Device,
+    surface_format: vk::Format,
+    debug_utils_loader: &ash::extensions::ext::DebugUtils,
+) -> Result<vk::RenderPass, String> {
+    log::info!("creating render pass");
+
     let mut attachment_descriptions = Vec::new();
 
     attachment_descriptions.push(
         vk::AttachmentDescription::builder()
-            .format(vulkan_base.surface_format.format)
+            .format(surface_format)
             .samples(vk::SampleCountFlags::TYPE_1)
             .load_op(vk::AttachmentLoadOp::CLEAR)
             .store_op(vk::AttachmentStoreOp::STORE)
@@ -39,18 +43,19 @@ pub fn create_render_pass(vulkan_base: &vulkan_base::VulkanBase) -> Result<vk::R
         .subpasses(&subpass_descriptions);
 
     let render_pass = unsafe {
-        vulkan_base
-            .device
+        device
             .create_render_pass(&create_info, None)
             .map_err(|_| String::from("failed to create render pass"))?
     };
 
-    vulkan::set_debug_utils_object_name(
-        &vulkan_base.debug_utils_loader,
-        vulkan_base.device.handle(),
+    vulkan_utils::set_debug_utils_object_name(
+        debug_utils_loader,
+        device.handle(),
         render_pass,
         "render pass",
     );
+
+    log::info!("render pass created");
 
     Ok(render_pass)
 }

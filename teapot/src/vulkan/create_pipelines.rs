@@ -1,16 +1,17 @@
-use crate::vulkan;
-use ash::version::DeviceV1_0;
 use ash::vk;
 
 pub fn create_pipelines(
-    vulkan_base: &vulkan_base::VulkanBase,
+    device: &ash::Device,
     vertex_shader_module: vk::ShaderModule,
     tess_control_shader_module: vk::ShaderModule,
     tess_eval_shader_module: vk::ShaderModule,
     fragment_shader_module: vk::ShaderModule,
     pipeline_layout: vk::PipelineLayout,
     render_pass: vk::RenderPass,
+    debug_utils_loader: &ash::extensions::ext::DebugUtils,
 ) -> Result<(vk::Pipeline, vk::Pipeline), String> {
+    log::info!("creating pipelines");
+
     let shader_entry_name = std::ffi::CString::new("main").unwrap();
 
     let vs_state = vk::PipelineShaderStageCreateInfo::builder()
@@ -120,8 +121,7 @@ pub fn create_pipelines(
     wireframe_pipeline_create_info.base_pipeline_index = 0;
 
     let pipelines = unsafe {
-        vulkan_base
-            .device
+        device
             .create_graphics_pipelines(
                 vk::PipelineCache::null(),
                 &[solid_pipeline_create_info, wireframe_pipeline_create_info],
@@ -133,19 +133,21 @@ pub fn create_pipelines(
     let solid_pipeline = pipelines[0];
     let wireframe_pipeline = pipelines[1];
 
-    vulkan::set_debug_utils_object_name(
-        &vulkan_base.debug_utils_loader,
-        vulkan_base.device.handle(),
+    vulkan_utils::set_debug_utils_object_name(
+        debug_utils_loader,
+        device.handle(),
         solid_pipeline,
         "solid pipeline",
     );
 
-    vulkan::set_debug_utils_object_name(
-        &vulkan_base.debug_utils_loader,
-        vulkan_base.device.handle(),
+    vulkan_utils::set_debug_utils_object_name(
+        debug_utils_loader,
+        device.handle(),
         wireframe_pipeline,
         "wireframe pipeline",
     );
+
+    log::info!("pipelines created");
 
     Ok((solid_pipeline, wireframe_pipeline))
 }
