@@ -62,24 +62,28 @@ impl VulkanBase {
         check_instance_version(&entry)?;
         check_required_instance_extensions(&entry, required_instance_extensions)?;
 
-        let instance = create_instance(&entry, required_instance_extensions)?;
-        let instance_sg = scopeguard::guard(instance, |instance| {
-            log::warn!("instance scopeguard");
-            unsafe {
-                instance.destroy_instance(None);
-            }
-        });
+        let instance_sg = {
+            let instance = create_instance(&entry, required_instance_extensions)?;
+            scopeguard::guard(instance, |instance| {
+                log::warn!("instance scopeguard");
+                unsafe {
+                    instance.destroy_instance(None);
+                }
+            })
+        };
 
         let debug_utils_loader = create_debug_utils_loader(&entry, &instance_sg);
         let surface_loader = create_surface_loader(&entry, &instance_sg);
 
-        let surface = create_surface(&entry, &instance_sg, window)?;
-        let surface_sg = scopeguard::guard(surface, |surface| {
-            log::warn!("surface scopeguard");
-            unsafe {
-                surface_loader.destroy_surface(surface, None);
-            }
-        });
+        let surface_sg = {
+            let surface = create_surface(&entry, &instance_sg, window)?;
+            scopeguard::guard(surface, |surface| {
+                log::warn!("surface scopeguard");
+                unsafe {
+                    surface_loader.destroy_surface(surface, None);
+                }
+            })
+        };
 
         let physical_device = get_physical_device(&instance_sg, &required_device_extensions)?;
         let physical_device_properties =
@@ -90,18 +94,20 @@ impl VulkanBase {
             get_queue_family(&instance_sg, physical_device, &surface_loader, *surface_sg)?;
         let depth_format = get_depth_format(&instance_sg, physical_device)?;
 
-        let device = create_logical_device(
-            &instance_sg,
-            physical_device,
-            queue_family,
-            &required_device_extensions,
-        )?;
-        let device_sg = scopeguard::guard(device, |device| {
-            log::warn!("device scopeguard");
-            unsafe {
-                device.destroy_device(None);
-            }
-        });
+        let device_sg = {
+            let device = create_logical_device(
+                &instance_sg,
+                physical_device,
+                queue_family,
+                &required_device_extensions,
+            )?;
+            scopeguard::guard(device, |device| {
+                log::warn!("device scopeguard");
+                unsafe {
+                    device.destroy_device(None);
+                }
+            })
+        };
 
         let queue = get_queue(&device_sg, queue_family);
 
