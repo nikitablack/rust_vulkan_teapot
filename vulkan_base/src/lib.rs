@@ -84,7 +84,7 @@ impl VulkanBase {
         let instance_sg = {
             let instance = create_instance(&entry, required_instance_extensions)?;
             guard(instance, |instance| {
-                log::info!("instance scopeguard");
+                log::warn!("instance scopeguard");
                 unsafe {
                     instance.destroy_instance(None);
                 }
@@ -97,7 +97,7 @@ impl VulkanBase {
         let surface_sg = {
             let surface = create_surface(&entry, &instance_sg, window)?;
             guard(surface, |surface| {
-                log::info!("surface scopeguard");
+                log::warn!("surface scopeguard");
                 unsafe {
                     surface_loader.destroy_surface(surface, None);
                 }
@@ -121,7 +121,7 @@ impl VulkanBase {
                 &required_device_extensions,
             )?;
             guard(device, |device| {
-                log::info!("device scopeguard");
+                log::warn!("device scopeguard");
                 unsafe {
                     device.destroy_device(None);
                 }
@@ -149,7 +149,7 @@ impl VulkanBase {
 
         let swapchain_sg = {
             guard(resize_data.swapchain, |swapchain| {
-                log::info!("swapchain scopeguard");
+                log::warn!("swapchain scopeguard");
                 unsafe {
                     swapchain_loader.destroy_swapchain(swapchain, None);
                 }
@@ -161,7 +161,7 @@ impl VulkanBase {
             for (i, &image_view) in resize_data.swapchain_image_views.iter().enumerate() {
                 let device = &device_sg;
                 let sg = guard(image_view, move |image_view| {
-                    log::info!("swapchain image view {} scopeguard", i);
+                    log::warn!("swapchain image view {} scopeguard", i);
                     unsafe {
                         device.destroy_image_view(image_view, None);
                     }
@@ -279,7 +279,7 @@ fn resize_internal(
             swapchain_loader,
         )?;
         guard(swapchain, |swapchain| {
-            log::info!("swapchain scopeguard");
+            log::warn!("swapchain scopeguard");
             unsafe {
                 swapchain_loader.destroy_swapchain(swapchain, None);
             }
@@ -305,7 +305,7 @@ fn resize_internal(
         let mut sgs = Vec::with_capacity(swapchain_image_views.len());
         for (i, &image_view) in swapchain_image_views.iter().enumerate() {
             let sg = guard(image_view, move |image_view| {
-                log::info!("swapchain image view {} scopeguard", i);
+                log::warn!("swapchain image view {} scopeguard", i);
                 unsafe {
                     device.destroy_image_view(image_view, None);
                 }
