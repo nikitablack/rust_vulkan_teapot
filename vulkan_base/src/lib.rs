@@ -63,13 +63,15 @@ impl VulkanBase {
         check_instance_version(&entry)?;
         check_required_instance_extensions(&entry, required_instance_extensions)?;
 
-        let instance = create_instance(&entry, required_instance_extensions)?;
-        let instance_sg = guard(instance, |instance| {
-            log::warn!("instance scopeguard");
-            unsafe {
-                instance.destroy_instance(None);
-            }
-        });
+        let instance_sg = {
+            let instance = create_instance(&entry, required_instance_extensions)?;
+            guard(instance, |instance| {
+                log::warn!("instance scopeguard");
+                unsafe {
+                    instance.destroy_instance(None);
+                }
+            })
+        };
 
         let debug_utils_loader = create_debug_utils_loader(&entry, &instance_sg);
         let surface_loader = create_surface_loader(&entry, &instance_sg);
