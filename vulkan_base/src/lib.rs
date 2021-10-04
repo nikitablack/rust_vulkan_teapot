@@ -17,6 +17,7 @@ mod get_surface_format;
 
 use ash::extensions::khr;
 use ash::vk;
+use scopeguard::{guard, ScopeGuard};
 
 use check_instance_version::*;
 use check_required_instance_extensions::*;
@@ -64,7 +65,7 @@ impl VulkanBase {
 
         let instance_sg = {
             let instance = create_instance(&entry, required_instance_extensions)?;
-            scopeguard::guard(instance, |instance| {
+            guard(instance, |instance| {
                 log::warn!("instance scopeguard");
                 unsafe {
                     instance.destroy_instance(None);
@@ -77,7 +78,7 @@ impl VulkanBase {
 
         let surface_sg = {
             let surface = create_surface(&entry, &instance_sg, window)?;
-            scopeguard::guard(surface, |surface| {
+            guard(surface, |surface| {
                 log::warn!("surface scopeguard");
                 unsafe {
                     surface_loader.destroy_surface(surface, None);
@@ -101,7 +102,7 @@ impl VulkanBase {
                 queue_family,
                 &required_device_extensions,
             )?;
-            scopeguard::guard(device, |device| {
+            guard(device, |device| {
                 log::warn!("device scopeguard");
                 unsafe {
                     device.destroy_device(None);
@@ -115,8 +116,8 @@ impl VulkanBase {
 
         Ok(VulkanBase {
             entry,
-            instance: scopeguard::ScopeGuard::into_inner(instance_sg),
-            surface: scopeguard::ScopeGuard::into_inner(surface_sg),
+            instance: ScopeGuard::into_inner(instance_sg),
+            surface: ScopeGuard::into_inner(surface_sg),
             surface_loader,
             debug_utils_loader,
             physical_device,
@@ -125,7 +126,7 @@ impl VulkanBase {
             present_mode,
             depth_format,
             queue_family,
-            device: scopeguard::ScopeGuard::into_inner(device_sg),
+            device: ScopeGuard::into_inner(device_sg),
             queue,
             allocator,
         })
