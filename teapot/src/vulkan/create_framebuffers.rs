@@ -1,15 +1,15 @@
-use crate::vulkan;
-use ash::version::DeviceV1_0;
 use ash::vk;
 
 pub fn create_framebuffers(
-    vulkan_base: &vulkan_base::VulkanBase,
+    device: &ash::Device,
+    swapchain_image_views: &Vec<vk::ImageView>,
     render_pass: vk::RenderPass,
     framebuffer_extent: vk::Extent2D,
+    debug_utils_loader: &ash::extensions::ext::DebugUtils,
 ) -> Result<Vec<vk::Framebuffer>, String> {
-    let mut framebuffers = Vec::with_capacity(vulkan_base.swapchain_image_views.len());
+    let mut framebuffers = Vec::with_capacity(swapchain_image_views.len());
 
-    for (i, &view) in vulkan_base.swapchain_image_views.iter().enumerate() {
+    for (i, &view) in swapchain_image_views.iter().enumerate() {
         let attachments = [view];
 
         let create_info = vk::FramebufferCreateInfo::builder()
@@ -21,22 +21,19 @@ pub fn create_framebuffers(
             .build();
 
         let framebuffer = unsafe {
-            vulkan_base
-                .device
-                .create_framebuffer(&create_info, None)
-                .map_err(|_| {
-                    for &fb in &framebuffers {
-                        vulkan_base.device.destroy_framebuffer(fb, None);
-                    }
-                    format!("failed to create framebuffer {}", i)
-                })?
+            device.create_framebuffer(&create_info, None).map_err(|_| {
+                for &fb in &framebuffers {
+                    device.destroy_framebuffer(fb, None);
+                }
+                format!("failed to create framebuffer {}", i)
+            })?
         };
 
         framebuffers.push(framebuffer);
 
-        vulkan::set_debug_utils_object_name(
-            &vulkan_base.debug_utils_loader,
-            vulkan_base.device.handle(),
+        vulkan_utils::set_debug_utils_object_name(
+            debug_utils_loader,
+            device.handle(),
             framebuffer,
             &format!("framebuffer {}", i),
         );

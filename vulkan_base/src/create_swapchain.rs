@@ -10,6 +10,8 @@ pub fn create_swapchain(
     present_mode: vk::PresentModeKHR,
     swapchain_loader: &khr::Swapchain,
 ) -> Result<vk::SwapchainKHR, String> {
+    log::info!("creating swapchain");
+
     let mut image_count = std::cmp::max(surface_capabilities.min_image_count, 3);
 
     if surface_capabilities.max_image_count != 0 {
@@ -45,6 +47,8 @@ pub fn create_swapchain(
 
         log::info!("old swapchain destroyed");
     }
+
+    log::info!("swapchain created");
 
     Ok(swapchain)
 }

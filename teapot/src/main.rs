@@ -98,7 +98,7 @@ fn main() {
                     return;
                 }
 
-                let vk_base = vk_base.as_ref().unwrap();
+                let vk_base = vk_base.as_mut().unwrap();
                 let vk_data = vk_data.as_mut().unwrap();
 
                 if vk_data.should_resize {
@@ -123,6 +123,8 @@ fn main() {
                 ..
             } => {
                 log::info!("resize requested {:?}", physical_size);
+
+                let vk_data = vk_data.as_mut().unwrap();
                 vk_data.should_resize = true;
             }
 

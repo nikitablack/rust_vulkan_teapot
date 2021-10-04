@@ -1,11 +1,12 @@
-use ash::version::DeviceV1_0;
 use ash::vk;
 
-pub fn get_swapchain_image_views(
+pub fn create_swapchain_image_views(
     device: &ash::Device,
     swapchain_images: &Vec<vk::Image>,
     surface_format: &vk::SurfaceFormatKHR,
 ) -> Result<Vec<vk::ImageView>, String> {
+    log::info!("creating swapchain images views");
+
     let mut swapchain_image_views = Vec::with_capacity(swapchain_images.len());
 
     for (i, &image) in swapchain_images.iter().enumerate() {
@@ -37,6 +38,8 @@ pub fn get_swapchain_image_views(
 
         swapchain_image_views.push(view);
     }
+
+    log::info!("swapchain images views created");
 
     Ok(swapchain_image_views)
 }

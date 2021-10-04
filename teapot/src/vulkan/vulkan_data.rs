@@ -265,11 +265,28 @@ impl VulkanData {
             (sg_1, sg_2)
         };
 
-        vulkan_data.framebuffers = vulkan::create_framebuffers(
-            vulkan_base,
-            vulkan_data.render_pass,
-            vulkan_base.surface_extent,
-        )?;
+        let framebuffer_sgs = {
+            let framebuffers = vulkan::create_framebuffers(
+                &vulkan_base.device,
+                &vulkan_base.swapchain_image_views,
+                *render_pass_sg,
+                vulkan_base.surface_extent,
+                &vulkan_base.debug_utils_loader,
+            )?;
+
+            let mut sgs = Vec::with_capacity(framebuffers.len());
+            for (i, &framebuffer) in framebuffers.iter().enumerate() {
+                let sg = guard(framebuffer, move |framebuffer| {
+                    log::info!("framebuffer {} scopeguard", i);
+                    unsafe {
+                        device.destroy_framebuffer(framebuffer, None);
+                    }
+                });
+                sgs.push(sg);
+            }
+
+            sgs
+        };
 
         Ok(VulkanData {
             vertex_shader_module: ScopeGuard::into_inner(vertex_sm_sg),
@@ -289,6 +306,11 @@ impl VulkanData {
             render_pass: ScopeGuard::into_inner(render_pass_sg),
             solid_pipeline: ScopeGuard::into_inner(solid_pipeline_sg),
             wireframe_pipeline: ScopeGuard::into_inner(wireframe_pipeline_sg),
+            framebuffers: framebuffer_sgs
+                .into_iter()
+                .map(|sg| ScopeGuard::into_inner(sg))
+                .collect(),
+            should_resize: false,
         })
     }
 
@@ -299,8 +321,13 @@ impl VulkanData {
             }
         }
 
-        self.framebuffers =
-            vulkan::create_framebuffers(vulkan_base, self.render_pass, vulkan_base.surface_extent)?;
+        self.framebuffers = vulkan::create_framebuffers(
+            &vulkan_base.device,
+            &vulkan_base.swapchain_image_views,
+            self.render_pass,
+            vulkan_base.surface_extent,
+            &vulkan_base.debug_utils_loader,
+        )?;
 
         Ok(())
     }
