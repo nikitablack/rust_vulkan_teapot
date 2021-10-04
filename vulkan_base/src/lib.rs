@@ -64,7 +64,7 @@ impl VulkanBase {
 
         let instance = create_instance(&entry, required_instance_extensions)?;
         let instance_sg = scopeguard::guard(instance, |instance| {
-            log::info!("something went wrong, destroying instance");
+            log::warn!("instance scopeguard");
             unsafe {
                 instance.destroy_instance(None);
             }
@@ -75,7 +75,7 @@ impl VulkanBase {
 
         let surface = create_surface(&entry, &instance_sg, window)?;
         let surface_sg = scopeguard::guard(surface, |surface| {
-            log::info!("something went wrong, destroying surface");
+            log::warn!("surface scopeguard");
             unsafe {
                 surface_loader.destroy_surface(surface, None);
             }
@@ -97,7 +97,7 @@ impl VulkanBase {
             &required_device_extensions,
         )?;
         let device_sg = scopeguard::guard(device, |device| {
-            log::info!("something went wrong, destroying device");
+            log::warn!("device scopeguard");
             unsafe {
                 device.destroy_device(None);
             }
