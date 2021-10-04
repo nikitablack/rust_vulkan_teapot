@@ -16,6 +16,7 @@ mod get_surface_format;
 
 use ash::extensions::khr;
 use ash::vk;
+use scopeguard::{guard, ScopeGuard};
 
 use check_instance_version::*;
 use check_required_instance_extensions::*;
@@ -60,7 +61,7 @@ impl VulkanBase {
         check_required_instance_extensions(&entry, required_instance_extensions)?;
 
         let instance = create_instance(&entry, required_instance_extensions)?;
-        let instance_sg = scopeguard::guard(instance, |instance| {
+        let instance_sg = guard(instance, |instance| {
             log::warn!("instance scopeguard");
             unsafe {
                 instance.destroy_instance(None);
@@ -71,7 +72,7 @@ impl VulkanBase {
         let surface_loader = create_surface_loader(&entry, &instance_sg);
 
         let surface = create_surface(&entry, &instance_sg, window)?;
-        let surface_sg = scopeguard::guard(surface, |surface| {
+        let surface_sg = guard(surface, |surface| {
             log::warn!("surface scopeguard");
             unsafe {
                 surface_loader.destroy_surface(surface, None);
@@ -93,7 +94,7 @@ impl VulkanBase {
             queue_family,
             &required_device_extensions,
         )?;
-        let device_sg = scopeguard::guard(device, |device| {
+        let device_sg = guard(device, |device| {
             log::warn!("device scopeguard");
             unsafe {
                 device.destroy_device(None);
@@ -104,8 +105,8 @@ impl VulkanBase {
 
         Ok(VulkanBase {
             entry,
-            instance: scopeguard::ScopeGuard::into_inner(instance_sg),
-            surface: scopeguard::ScopeGuard::into_inner(surface_sg),
+            instance: ScopeGuard::into_inner(instance_sg),
+            surface: ScopeGuard::into_inner(surface_sg),
             surface_loader,
             debug_utils_loader,
             physical_device,
@@ -114,7 +115,7 @@ impl VulkanBase {
             present_mode,
             depth_format,
             queue_family,
-            device: scopeguard::ScopeGuard::into_inner(device_sg),
+            device: ScopeGuard::into_inner(device_sg),
             queue,
         })
     }
