@@ -1,6 +1,4 @@
-use crate::vulkan;
 use crate::VulkanData;
-use ash::version::DeviceV1_0;
 use ash::vk;
 use cgmath::{num_traits::ToPrimitive, perspective, Deg, Matrix4, Point3, Vector3};
 use vulkan_base::VulkanBase;
@@ -258,7 +256,7 @@ fn allocate_descriptor_set(
 
     let set = descriptor_sets[0];
 
-    vulkan::set_debug_utils_object_name(
+    vulkan_utils::set_debug_utils_object_name(
         &vulkan_base.debug_utils_loader,
         vulkan_base.device.handle(),
         set,
@@ -443,33 +441,13 @@ pub fn draw(
     let mvp = projection * view * model;
 
     let curr_uniform_buffer =
-        &vulkan_data.uniform_mem_buffers[vulkan_data.curr_resource_index as usize];
-
-    let allocation_info = vulkan_base
-        .allocator
-        .get_allocation_info(&curr_uniform_buffer.allocation)
-        .map_err(|_| String::from("failed to get allocation info for uniform buffer"))?;
+        &mut vulkan_data.uniform_mem_buffers[vulkan_data.curr_resource_index as usize];
 
     let mvp_data = cgmath::conv::array4(mvp);
     let mvp_data_bytes = bytemuck::cast_slice(&mvp_data);
 
-    unsafe {
-        std::ptr::copy_nonoverlapping(
-            mvp_data_bytes.as_ptr(),
-            allocation_info.get_mapped_data(),
-            16 * 4,
-        )
-    };
-
-    vulkan_base
-        .allocator
-        .flush_allocation(&curr_uniform_buffer.allocation, 0, vk::WHOLE_SIZE as usize)
-        .map_err(|_| {
-            format!(
-                "failed to flush allocation for uniform buffer {}",
-                vulkan_data.curr_resource_index
-            )
-        })?;
+    curr_uniform_buffer.allocation.mapped_slice_mut().unwrap()[..16 * 4]
+        .copy_from_slice(mvp_data_bytes);
 
     unsafe {
         vulkan_base.device.cmd_push_constants(

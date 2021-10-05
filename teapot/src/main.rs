@@ -120,8 +120,8 @@ fn main() {
                 }
 
                 if let Err(msg) = vulkan::draw(
-                    &mut vk_data,
-                    &vk_base,
+                    vk_data,
+                    vk_base,
                     (std::time::Instant::now() - start_time).as_secs_f32(),
                 ) {
                     panic!("{}", msg);
@@ -155,13 +155,16 @@ fn main() {
                 ..
             } => match virtual_code {
                 VirtualKeyCode::Space => {
+                    let vk_data = vk_data.as_mut().unwrap();
                     vk_data.is_wireframe_mode = !vk_data.is_wireframe_mode;
                 }
                 VirtualKeyCode::Plus | VirtualKeyCode::NumpadAdd => {
+                    let vk_data = vk_data.as_mut().unwrap();
                     vk_data.tesselation_level += 0.1f32;
                     vk_data.tesselation_level = vk_data.tesselation_level.min(64.0);
                 }
                 VirtualKeyCode::Minus | VirtualKeyCode::NumpadSubtract => {
+                    let vk_data = vk_data.as_mut().unwrap();
                     vk_data.tesselation_level -= 0.1f32;
                     vk_data.tesselation_level = vk_data.tesselation_level.max(1.0);
                 }

@@ -1,8 +1,11 @@
-use crate::vulkan;
-use ash::version::DeviceV1_0;
 use ash::vk;
 
-pub fn create_fences(vulkan_base: &vulkan_base::VulkanBase) -> Result<Vec<vk::Fence>, String> {
+pub fn create_fences(
+    device: &ash::Device,
+    debug_utils_loader: &ash::extensions::ext::DebugUtils,
+) -> Result<Vec<vk::Fence>, String> {
+    log::info!("creating fences");
+
     let create_info = vk::FenceCreateInfo::builder()
         .flags(vk::FenceCreateFlags::SIGNALED)
         .build();
@@ -11,27 +14,26 @@ pub fn create_fences(vulkan_base: &vulkan_base::VulkanBase) -> Result<Vec<vk::Fe
 
     for i in 0..crate::CONCURRENT_RESOURCE_COUNT {
         let fence = unsafe {
-            vulkan_base
-                .device
-                .create_fence(&create_info, None)
-                .map_err(|_| {
-                    for &f in &fences {
-                        vulkan_base.device.destroy_fence(f, None);
-                    }
+            device.create_fence(&create_info, None).map_err(|_| {
+                for &f in &fences {
+                    device.destroy_fence(f, None);
+                }
 
-                    format!("failed to create fence {}", i)
-                })?
+                format!("failed to create fence {}", i)
+            })?
         };
 
         fences.push(fence);
 
-        vulkan::set_debug_utils_object_name(
-            &vulkan_base.debug_utils_loader,
-            vulkan_base.device.handle(),
+        vulkan_utils::set_debug_utils_object_name(
+            debug_utils_loader,
+            device.handle(),
             fence,
             &format!("fence {}", i),
         );
     }
+
+    log::info!("fences created");
 
     Ok(fences)
 }

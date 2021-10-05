@@ -298,18 +298,82 @@ impl VulkanData {
             sgs
         };
 
-        vulkan_data.image_available_semaphore =
-            vulkan::create_semaphore(vulkan_base, "image available semaphore")?;
-        vulkan_data.rendering_finished_semaphore =
-            vulkan::create_semaphore(vulkan_base, "rendering finished semaphore")?;
+        let image_available_semaphore_sg = {
+            let semaphore = vulkan_utils::create_semaphore(
+                &vulkan_base.device,
+                &vulkan_base.debug_utils_loader,
+                "image available semaphore",
+            )?;
 
-        vulkan_data.fences = vulkan::create_fences(vulkan_base)?;
-        vulkan_data.command_pools = vulkan::create_command_pools(vulkan_base)?;
-        vulkan_data.descriptor_pools = vulkan::create_descriptor_pools(vulkan_base)?;
-        vulkan_data.available_command_buffers =
-            vec![vec![]; crate::CONCURRENT_RESOURCE_COUNT as usize];
-        vulkan_data.used_command_buffers = vec![vec![]; crate::CONCURRENT_RESOURCE_COUNT as usize];
-        vulkan_data.tesselation_level = 1.0;
+            guard(semaphore, |semaphore| {
+                log::warn!("image available semaphore scopeguard");
+                unsafe {
+                    device.destroy_semaphore(semaphore, None);
+                }
+            })
+        };
+
+        let rendering_finished_semaphore_sg = {
+            let semaphore = vulkan_utils::create_semaphore(
+                &vulkan_base.device,
+                &vulkan_base.debug_utils_loader,
+                "rendering finished semaphore",
+            )?;
+
+            guard(semaphore, |semaphore| {
+                log::warn!("rendering finished semaphore scopeguard");
+                unsafe {
+                    device.destroy_semaphore(semaphore, None);
+                }
+            })
+        };
+
+        let fences_sg = {
+            let fences =
+                vulkan::create_fences(&vulkan_base.device, &vulkan_base.debug_utils_loader)?;
+
+            guard(fences, |fences| {
+                log::warn!("fences scopeguard");
+                unsafe {
+                    for f in fences {
+                        device.destroy_fence(f, None);
+                    }
+                }
+            })
+        };
+
+        let command_pools_sg = {
+            let command_pools = vulkan::create_command_pools(
+                &vulkan_base.device,
+                vulkan_base.queue_family,
+                &vulkan_base.debug_utils_loader,
+            )?;
+
+            guard(command_pools, |command_pools| {
+                log::warn!("command pools scopeguard");
+                unsafe {
+                    for cp in command_pools {
+                        device.destroy_command_pool(cp, None);
+                    }
+                }
+            })
+        };
+
+        let descriptor_pools_sg = {
+            let descriptor_pools = vulkan::create_descriptor_pools(
+                &vulkan_base.device,
+                &vulkan_base.debug_utils_loader,
+            )?;
+
+            guard(descriptor_pools, |descriptor_pools| {
+                log::warn!("descriptor pools scopeguard");
+                unsafe {
+                    for dp in descriptor_pools {
+                        device.destroy_descriptor_pool(dp, None);
+                    }
+                }
+            })
+        };
 
         Ok(VulkanData {
             vertex_shader_module: ScopeGuard::into_inner(vertex_sm_sg),
@@ -334,6 +398,16 @@ impl VulkanData {
                 .map(|sg| ScopeGuard::into_inner(sg))
                 .collect(),
             should_resize: false,
+            image_available_semaphore: ScopeGuard::into_inner(image_available_semaphore_sg),
+            rendering_finished_semaphore: ScopeGuard::into_inner(rendering_finished_semaphore_sg),
+            fences: ScopeGuard::into_inner(fences_sg),
+            command_pools: ScopeGuard::into_inner(command_pools_sg),
+            descriptor_pools: ScopeGuard::into_inner(descriptor_pools_sg),
+            available_command_buffers: vec![vec![]; crate::CONCURRENT_RESOURCE_COUNT as usize],
+            used_command_buffers: vec![vec![]; crate::CONCURRENT_RESOURCE_COUNT as usize],
+            curr_resource_index: 0,
+            is_wireframe_mode: false,
+            tesselation_level: 1.0,
         })
     }
 
