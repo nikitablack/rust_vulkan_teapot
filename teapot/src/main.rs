@@ -81,15 +81,7 @@ fn main() {
 
                 log::info!("exit requested");
 
-                let mut vk_base = vk_base.take().unwrap();
-                let vk_data = vk_data.take().unwrap();
-
-                unsafe {
-                    let _ = vk_base.device.device_wait_idle();
-                }
-
-                vk_data.clean(&mut vk_base);
-                vk_base.clean();
+                vulkan::vulkan_clean(&mut vk_base, &mut vk_data);
 
                 app_exit = true;
             }
