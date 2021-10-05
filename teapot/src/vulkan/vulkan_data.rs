@@ -159,30 +159,34 @@ impl VulkanData {
             })
         };
 
-        let mut uniform_mem_buffer_sgs =
-            Vec::with_capacity(crate::CONCURRENT_RESOURCE_COUNT as usize);
-        for i in 0..crate::CONCURRENT_RESOURCE_COUNT {
-            let mem_buffer = vulkan_utils::create_buffer(
-                &vulkan_base.device,
-                *allocator_rc.borrow_mut(),
-                &vulkan_base.debug_utils_loader,
-                (16 * std::mem::size_of::<f32>()) as vk::DeviceSize,
-                vk::BufferUsageFlags::UNIFORM_BUFFER,
-                gpu_allocator::MemoryLocation::CpuToGpu,
-                &format!("uniform buffer {}", i),
-            )?;
+        let uniform_mem_buffers_sg = {
+            let mut mem_buffers = Vec::with_capacity(crate::CONCURRENT_RESOURCE_COUNT as usize);
+            for i in 0..crate::CONCURRENT_RESOURCE_COUNT {
+                let mem_buffer = vulkan_utils::create_buffer(
+                    &vulkan_base.device,
+                    *allocator_rc.borrow_mut(),
+                    &vulkan_base.debug_utils_loader,
+                    (16 * std::mem::size_of::<f32>()) as vk::DeviceSize,
+                    vk::BufferUsageFlags::UNIFORM_BUFFER,
+                    gpu_allocator::MemoryLocation::CpuToGpu,
+                    &format!("uniform buffer {}", i),
+                )?;
 
-            let allocator_rc = &allocator_rc;
-            let uniform_mem_buffer_sg = guard(mem_buffer, move |mem_buffer| {
-                log::warn!("uniform buffer {} scopeguard", i);
-                unsafe {
-                    device.destroy_buffer(mem_buffer.buffer, None);
+                mem_buffers.push(mem_buffer);
+            }
+
+            //let allocator_rc = &allocator_rc;
+            guard(mem_buffers, |mem_buffers| {
+                log::warn!("uniform buffers scopeguard");
+
+                for mem_buffer in mem_buffers {
+                    unsafe {
+                        device.destroy_buffer(mem_buffer.buffer, None);
+                    }
+                    let _ = allocator_rc.borrow_mut().free(mem_buffer.allocation);
                 }
-                let _ = allocator_rc.borrow_mut().free(mem_buffer.allocation);
-            });
-
-            uniform_mem_buffer_sgs.push(uniform_mem_buffer_sg);
-        }
+            })
+        };
 
         Ok(VulkanData {
             vertex_shader_module: ScopeGuard::into_inner(vertex_sm_sg),
@@ -193,10 +197,7 @@ impl VulkanData {
             patches_mem_buffer: ScopeGuard::into_inner(patches_mem_buffer_sg),
             patch_point_count,
             instances_mem_buffer: ScopeGuard::into_inner(instances_mem_buffer_sg),
-            uniform_mem_buffers: uniform_mem_buffer_sgs
-                .into_iter()
-                .map(|sg| ScopeGuard::into_inner(sg))
-                .collect(),
+            uniform_mem_buffers: ScopeGuard::into_inner(uniform_mem_buffers_sg),
         })
     }
 
