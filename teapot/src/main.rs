@@ -120,15 +120,19 @@ fn main() {
                 }
 
                 if let Err(msg) = vulkan::draw(
-                    vk_data,
-                    vk_base,
+                    vk_data_ref,
+                    vk_base_ref,
                     (std::time::Instant::now() - start_time).as_secs_f32(),
                 ) {
-                    panic!("{}", msg);
+                    log::error!("{}", msg);
+                    vulkan::vulkan_clean(&mut vk_base, &mut vk_data);
+                    app_exit = true;
+                    *control_flow = ControlFlow::Exit;
+                    return;
                 }
 
-                vk_data.curr_resource_index =
-                    (vk_data.curr_resource_index + 1) % CONCURRENT_RESOURCE_COUNT;
+                vk_data_ref.curr_resource_index =
+                    (vk_data_ref.curr_resource_index + 1) % CONCURRENT_RESOURCE_COUNT;
             }
 
             Event::WindowEvent {
