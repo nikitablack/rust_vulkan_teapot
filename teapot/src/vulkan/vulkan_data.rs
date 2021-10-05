@@ -268,7 +268,7 @@ impl VulkanData {
             (sg_1, sg_2)
         };
 
-        let framebuffer_sgs = {
+        let framebuffers_sg = {
             let framebuffers = vulkan::create_framebuffers(
                 &vulkan_base.device,
                 &vulkan_base.swapchain_image_views,
@@ -277,18 +277,14 @@ impl VulkanData {
                 &vulkan_base.debug_utils_loader,
             )?;
 
-            let mut sgs = Vec::with_capacity(framebuffers.len());
-            for (i, &framebuffer) in framebuffers.iter().enumerate() {
-                let sg = guard(framebuffer, move |framebuffer| {
-                    log::info!("framebuffer {} scopeguard", i);
+            guard(framebuffers, move |framebuffers| {
+                log::warn!("framebuffers scopeguard");
+                for fb in framebuffers {
                     unsafe {
-                        device.destroy_framebuffer(framebuffer, None);
+                        device.destroy_framebuffer(fb, None);
                     }
-                });
-                sgs.push(sg);
-            }
-
-            sgs
+                }
+            })
         };
 
         Ok(VulkanData {
@@ -306,10 +302,7 @@ impl VulkanData {
             render_pass: ScopeGuard::into_inner(render_pass_sg),
             solid_pipeline: ScopeGuard::into_inner(solid_pipeline_sg),
             wireframe_pipeline: ScopeGuard::into_inner(wireframe_pipeline_sg),
-            framebuffers: framebuffer_sgs
-                .into_iter()
-                .map(|sg| ScopeGuard::into_inner(sg))
-                .collect(),
+            framebuffers: ScopeGuard::into_inner(framebuffers_sg),
             should_resize: false,
         })
     }

@@ -90,20 +90,28 @@ fn main() {
                     return;
                 }
 
-                let vk_base = vk_base.as_mut().unwrap();
-                let vk_data = vk_data.as_mut().unwrap();
+                let vk_base_ref = vk_base.as_mut().unwrap();
+                let vk_data_ref = vk_data.as_mut().unwrap();
 
-                if vk_data.should_resize {
-                    vk_data.should_resize = false;
+                if vk_data_ref.should_resize {
+                    vk_data_ref.should_resize = false;
 
                     log::info!("handling resize");
 
-                    if let Err(msg) = vk_base.resize(&window) {
-                        panic!("{}", msg);
+                    if let Err(msg) = vk_base_ref.resize(&window) {
+                        log::error!("{}", msg);
+                        vulkan::vulkan_clean(&mut vk_base, &mut vk_data);
+                        app_exit = true;
+                        *control_flow = ControlFlow::Exit;
+                        return;
                     }
 
-                    if let Err(msg) = vk_data.resize(&vk_base) {
-                        panic!("{}", msg);
+                    if let Err(msg) = vk_data_ref.resize(&vk_base_ref) {
+                        log::error!("{}", msg);
+                        vulkan::vulkan_clean(&mut vk_base, &mut vk_data);
+                        app_exit = true;
+                        *control_flow = ControlFlow::Exit;
+                        return;
                     }
                 }
 

@@ -156,20 +156,15 @@ impl VulkanBase {
             })
         };
 
-        let swapchain_image_view_sgs = {
-            let mut sgs = Vec::with_capacity(resize_data.swapchain_image_views.len());
-            for (i, &image_view) in resize_data.swapchain_image_views.iter().enumerate() {
-                let device = &device_sg;
-                let sg = guard(image_view, move |image_view| {
-                    log::warn!("swapchain image view {} scopeguard", i);
+        let swapchain_image_views_sg = {
+            guard(resize_data.swapchain_image_views, |image_views| {
+                log::warn!("swapchain image views scopeguard");
+                for view in image_views {
                     unsafe {
-                        device.destroy_image_view(image_view, None);
+                        device_sg.destroy_image_view(view, None);
                     }
-                });
-                sgs.push(sg);
-            }
-
-            sgs
+                }
+            })
         };
 
         Ok(VulkanBase {
@@ -190,10 +185,7 @@ impl VulkanBase {
             surface_extent: resize_data.surface_extent,
             swapchain: ScopeGuard::into_inner(swapchain_sg),
             swapchain_images: resize_data.swapchain_images,
-            swapchain_image_views: swapchain_image_view_sgs
-                .into_iter()
-                .map(|sg| ScopeGuard::into_inner(sg))
-                .collect(),
+            swapchain_image_views: ScopeGuard::into_inner(swapchain_image_views_sg),
             swapchain_loader,
             device: ScopeGuard::into_inner(device_sg),
         })
