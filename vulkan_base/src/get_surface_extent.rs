@@ -27,7 +27,7 @@ pub fn get_surface_extent(
         surface_extent = surface_capabilities.current_extent;
     }
 
-    log::info!("surface extent: {:?}", surface_extent);
+    log::info!("surface extent got: {:?}", surface_extent);
 
     surface_extent
 }
