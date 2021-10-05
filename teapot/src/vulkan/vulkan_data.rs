@@ -175,7 +175,6 @@ impl VulkanData {
                 mem_buffers.push(mem_buffer);
             }
 
-            //let allocator_rc = &allocator_rc;
             guard(mem_buffers, |mem_buffers| {
                 log::warn!("uniform buffers scopeguard");
 
