@@ -1,10 +1,11 @@
-use crate::vulkan;
-use ash::version::DeviceV1_0;
 use ash::vk;
 
 pub fn create_descriptor_pools(
-    vulkan_base: &vulkan_base::VulkanBase,
+    device: &ash::Device,
+    debug_utils_loader: &ash::extensions::ext::DebugUtils,
 ) -> Result<Vec<vk::DescriptorPool>, String> {
+    log::info!("creating descriptor pools");
+
     let pool_size_1 = vk::DescriptorPoolSize {
         ty: vk::DescriptorType::STORAGE_BUFFER,
         descriptor_count: 100,
@@ -25,26 +26,27 @@ pub fn create_descriptor_pools(
 
     for i in 0..crate::CONCURRENT_RESOURCE_COUNT {
         let pool = unsafe {
-            vulkan_base
-                .device
+            device
                 .create_descriptor_pool(&create_info, None)
                 .map_err(|_| {
                     for &p in &descriptor_pools {
-                        vulkan_base.device.destroy_descriptor_pool(p, None);
+                        device.destroy_descriptor_pool(p, None);
                     }
                     format!("failed to create descriptor pool {}", i)
                 })?
         };
 
-        vulkan::set_debug_utils_object_name(
-            &vulkan_base.debug_utils_loader,
-            vulkan_base.device.handle(),
+        vulkan_utils::set_debug_utils_object_name(
+            debug_utils_loader,
+            device.handle(),
             pool,
             &format!("descriptor pool {}", i),
         );
 
         descriptor_pools.push(pool);
     }
+
+    log::info!("descriptor pools created");
 
     Ok(descriptor_pools)
 }

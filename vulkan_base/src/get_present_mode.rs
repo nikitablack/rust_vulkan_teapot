@@ -6,6 +6,8 @@ pub fn get_present_mode(
     surface_loader: &khr::Surface,
     surface: vk::SurfaceKHR,
 ) -> Result<vk::PresentModeKHR, String> {
+    log::info!("getting present mode");
+
     let modes = match unsafe {
         surface_loader.get_physical_device_surface_present_modes(physical_device, surface)
     } {
@@ -24,12 +26,24 @@ pub fn get_present_mode(
     }
 
     if modes.contains(&vk::PresentModeKHR::MAILBOX) {
-        return Ok(vk::PresentModeKHR::MAILBOX);
+        let present_mode = vk::PresentModeKHR::MAILBOX;
+
+        log::info!("selected present mode: {:?}", present_mode);
+
+        return Ok(present_mode);
     }
 
     if modes.contains(&vk::PresentModeKHR::IMMEDIATE) {
-        return Ok(vk::PresentModeKHR::IMMEDIATE);
+        let present_mode = vk::PresentModeKHR::IMMEDIATE;
+
+        log::info!("selected present mode: {:?}", present_mode);
+
+        return Ok(present_mode);
     }
 
-    Ok(vk::PresentModeKHR::FIFO)
+    let present_mode = vk::PresentModeKHR::FIFO;
+
+    log::info!("selected present mode: {:?}", present_mode);
+
+    Ok(present_mode)
 }

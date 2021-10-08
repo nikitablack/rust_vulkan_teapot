@@ -1,7 +1,6 @@
 mod teapot_data;
 mod vulkan;
 
-use ash::version::DeviceV1_0;
 use vulkan::VulkanData;
 use vulkan_base::VulkanBase;
 
@@ -35,18 +34,11 @@ fn main() {
         .unwrap();
 
     // vulkan base
-    let enable_debug_utils = true;
     let device_extensions = vec![ash::extensions::khr::Swapchain::name()];
-    let instance_extensions =
-        vulkan::get_required_instance_extensions(&window, enable_debug_utils).unwrap();
+    let instance_extensions = vulkan::get_required_instance_extensions(&window).unwrap();
 
-    let mut vk_base = match VulkanBase::new(
-        &window,
-        &instance_extensions,
-        &device_extensions,
-        enable_debug_utils,
-    ) {
-        Ok(vk_base) => vk_base,
+    let mut vk_base = match VulkanBase::new(&window, &instance_extensions, &device_extensions) {
+        Ok(vk_base) => Some(vk_base),
         Err(msg) => {
             log::error!("{}", msg);
             panic!("{}", msg);
@@ -54,10 +46,12 @@ fn main() {
     };
 
     // vulkan data
-    let mut vk_data = match VulkanData::new(&vk_base) {
-        Ok(vk_data) => vk_data,
+    let mut vk_data = match VulkanData::new(vk_base.as_mut().unwrap()) {
+        Ok(vk_data) => Some(vk_data),
         Err(msg) => {
             log::error!("{}", msg);
+            let vk_base = vk_base.unwrap();
+            vk_base.clean();
             panic!("{}", msg);
         }
     };
@@ -85,12 +79,7 @@ fn main() {
 
                 log::info!("exit requested");
 
-                unsafe {
-                    let _ = vk_base.device.device_wait_idle();
-                }
-
-                vk_data.clean(&vk_base);
-                vk_base.clean();
+                vulkan::vulkan_clean(&mut vk_base, &mut vk_data);
 
                 app_exit = true;
             }
@@ -105,30 +94,45 @@ fn main() {
                     return;
                 }
 
-                if vk_data.should_resize {
-                    vk_data.should_resize = false;
+                let vk_base_ref = vk_base.as_mut().unwrap();
+                let vk_data_ref = vk_data.as_mut().unwrap();
+
+                if vk_data_ref.should_resize {
+                    vk_data_ref.should_resize = false;
 
                     log::info!("handling resize");
 
-                    if let Err(msg) = vk_base.resize(&window) {
-                        panic!("{}", msg);
+                    if let Err(msg) = vk_base_ref.resize(&window) {
+                        log::error!("{}", msg);
+                        vulkan::vulkan_clean(&mut vk_base, &mut vk_data);
+                        app_exit = true;
+                        *control_flow = ControlFlow::Exit;
+                        return;
                     }
 
-                    if let Err(msg) = vk_data.resize(&vk_base) {
-                        panic!("{}", msg);
+                    if let Err(msg) = vk_data_ref.resize(&vk_base_ref) {
+                        log::error!("{}", msg);
+                        vulkan::vulkan_clean(&mut vk_base, &mut vk_data);
+                        app_exit = true;
+                        *control_flow = ControlFlow::Exit;
+                        return;
                     }
                 }
 
                 if let Err(msg) = vulkan::draw(
-                    &mut vk_data,
-                    &vk_base,
+                    vk_data_ref,
+                    vk_base_ref,
                     (std::time::Instant::now() - start_time).as_secs_f32(),
                 ) {
-                    panic!("{}", msg);
+                    log::error!("{}", msg);
+                    vulkan::vulkan_clean(&mut vk_base, &mut vk_data);
+                    app_exit = true;
+                    *control_flow = ControlFlow::Exit;
+                    return;
                 }
 
-                vk_data.curr_resource_index =
-                    (vk_data.curr_resource_index + 1) % CONCURRENT_RESOURCE_COUNT;
+                vk_data_ref.curr_resource_index =
+                    (vk_data_ref.curr_resource_index + 1) % CONCURRENT_RESOURCE_COUNT;
             }
 
             Event::WindowEvent {
@@ -136,6 +140,8 @@ fn main() {
                 ..
             } => {
                 log::info!("resize requested {:?}", physical_size);
+
+                let vk_data = vk_data.as_mut().unwrap();
                 vk_data.should_resize = true;
             }
 
@@ -153,13 +159,16 @@ fn main() {
                 ..
             } => match virtual_code {
                 VirtualKeyCode::Space => {
+                    let vk_data = vk_data.as_mut().unwrap();
                     vk_data.is_wireframe_mode = !vk_data.is_wireframe_mode;
                 }
                 VirtualKeyCode::Plus | VirtualKeyCode::NumpadAdd => {
+                    let vk_data = vk_data.as_mut().unwrap();
                     vk_data.tesselation_level += 0.1f32;
                     vk_data.tesselation_level = vk_data.tesselation_level.min(64.0);
                 }
                 VirtualKeyCode::Minus | VirtualKeyCode::NumpadSubtract => {
+                    let vk_data = vk_data.as_mut().unwrap();
                     vk_data.tesselation_level -= 0.1f32;
                     vk_data.tesselation_level = vk_data.tesselation_level.max(1.0);
                 }
