@@ -3,6 +3,7 @@ use ash::vk;
 pub fn create_render_pass(
     device: &ash::Device,
     surface_format: vk::Format,
+    depth_format: vk::Format,
     debug_utils_loader: &ash::extensions::ext::DebugUtils,
 ) -> Result<vk::RenderPass, String> {
     log::info!("creating render pass");
@@ -24,7 +25,7 @@ pub fn create_render_pass(
 
     attachment_descriptions.push(
         vk::AttachmentDescription::builder()
-            .format(vulkan_base.depth_format)
+            .format(depth_format)
             .samples(vk::SampleCountFlags::TYPE_1)
             .load_op(vk::AttachmentLoadOp::CLEAR)
             .store_op(vk::AttachmentStoreOp::DONT_CARE)

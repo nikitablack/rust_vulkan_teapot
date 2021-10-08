@@ -21,7 +21,6 @@ pub struct VulkanData {
     pub render_pass: vk::RenderPass,
     pub solid_pipeline: vk::Pipeline,
     pub wireframe_pipeline: vk::Pipeline,
-    pub depth_buffer: MemImage,
     pub framebuffers: Vec<vk::Framebuffer>,
     pub should_resize: bool,
     pub image_available_semaphore: vk::Semaphore,
@@ -239,6 +238,7 @@ impl VulkanData {
             let render_pass = vulkan::create_render_pass(
                 &vulkan_base.device,
                 vulkan_base.surface_format.format,
+                vulkan_base.depth_format,
                 &vulkan_base.debug_utils_loader,
             )?;
 
@@ -278,13 +278,14 @@ impl VulkanData {
 
             (sg_1, sg_2)
         };
-        vulkan_data.depth_buffer = vulkan::create_depth_buffer(vulkan_base)?;
+
         let framebuffers_sg = {
             let framebuffers = vulkan::create_framebuffers(
                 &vulkan_base.device,
                 &vulkan_base.swapchain_image_views,
                 *render_pass_sg,
                 vulkan_base.surface_extent,
+                vulkan_base.depth_buffer_mem_image.view,
                 &vulkan_base.debug_utils_loader,
             )?;
 
@@ -407,26 +408,17 @@ impl VulkanData {
 
     pub fn resize(&mut self, vulkan_base: &VulkanBase) -> Result<(), String> {
         unsafe {
-            let _ = vulkan_base
-                .allocator
-                .destroy_image(self.depth_buffer.image, &self.depth_buffer.allocation);
-
-            vulkan_base
-                .device
-                .destroy_image_view(self.depth_buffer.view, None);
-
             for &framebuffer in &self.framebuffers {
                 vulkan_base.device.destroy_framebuffer(framebuffer, None);
             }
         }
-
-        self.depth_buffer = vulkan::create_depth_buffer(vulkan_base)?;
 
         self.framebuffers = vulkan::create_framebuffers(
             &vulkan_base.device,
             &vulkan_base.swapchain_image_views,
             self.render_pass,
             vulkan_base.surface_extent,
+            vulkan_base.depth_buffer_mem_image.view,
             &vulkan_base.debug_utils_loader,
         )?;
 
@@ -478,14 +470,6 @@ impl VulkanData {
             vulkan_base
                 .device
                 .destroy_pipeline(self.wireframe_pipeline, None);
-
-            let _ = vulkan_base
-                .allocator
-                .destroy_image(self.depth_buffer.image, &self.depth_buffer.allocation);
-
-            vulkan_base
-                .device
-                .destroy_image_view(self.depth_buffer.view, None);
 
             for &framebuffer in &self.framebuffers {
                 vulkan_base.device.destroy_framebuffer(framebuffer, None);

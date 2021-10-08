@@ -2,6 +2,7 @@ mod check_instance_version;
 mod check_required_instance_extensions;
 mod create_allocator;
 mod create_debug_utils_loader;
+mod create_depth_buffer;
 mod create_entry;
 mod create_instance;
 mod create_logical_device;
@@ -29,6 +30,7 @@ use check_instance_version::*;
 use check_required_instance_extensions::*;
 use create_allocator::*;
 use create_debug_utils_loader::*;
+use create_depth_buffer::*;
 use create_entry::*;
 use create_instance::*;
 use create_logical_device::*;
@@ -69,6 +71,7 @@ pub struct VulkanBase {
     pub swapchain: vk::SwapchainKHR,
     pub swapchain_images: Vec<vk::Image>,
     pub swapchain_image_views: Vec<vk::ImageView>,
+    pub depth_buffer_mem_image: vulkan_utils::MemImage,
 }
 
 impl VulkanBase {
@@ -130,7 +133,7 @@ impl VulkanBase {
 
         let queue = get_queue(&device_sg, queue_family);
 
-        let allocator = create_allocator(&instance_sg, &device_sg, physical_device)?;
+        let mut allocator = create_allocator(&instance_sg, &device_sg, physical_device)?;
 
         let swapchain_loader = create_swapchain_loader(&instance_sg, &device_sg);
 
@@ -145,6 +148,14 @@ impl VulkanBase {
             &surface_format,
             present_mode,
             &vec![],
+            depth_format,
+            &mut allocator,
+            &vulkan_utils::MemImage {
+                image: vk::Image::null(),
+                view: vk::ImageView::null(),
+                extent: vk::Extent3D::default(),
+                allocation: gpu_allocator::vulkan::Allocation::default(),
+            },
         )?;
 
         let swapchain_sg = {
@@ -188,6 +199,7 @@ impl VulkanBase {
             swapchain_image_views: ScopeGuard::into_inner(swapchain_image_views_sg),
             swapchain_loader,
             device: ScopeGuard::into_inner(device_sg),
+            depth_buffer_mem_image: resize_data.depth_buffer_mem_image,
         })
     }
 
@@ -203,6 +215,9 @@ impl VulkanBase {
             &self.surface_format,
             self.present_mode,
             &self.swapchain_image_views,
+            self.depth_format,
+            &mut self.allocator,
+            &self.depth_buffer_mem_image,
         )?;
 
         self.surface_capabilities = resize_data.surface_capabilities;
@@ -210,14 +225,20 @@ impl VulkanBase {
         self.swapchain = resize_data.swapchain;
         self.swapchain_images = resize_data.swapchain_images;
         self.swapchain_image_views = resize_data.swapchain_image_views;
+        self.depth_buffer_mem_image = resize_data.depth_buffer_mem_image;
 
         Ok(())
     }
 
-    pub fn clean(self) {
+    pub fn clean(mut self) {
         log::info!("cleaning vulkan base");
 
         unsafe {
+            self.device
+                .destroy_image(self.depth_buffer_mem_image.image, None);
+            self.device
+                .destroy_image_view(self.depth_buffer_mem_image.view, None);
+            let _ = self.allocator.free(self.depth_buffer_mem_image.allocation);
             self.swapchain_loader
                 .destroy_swapchain(self.swapchain, None);
             for &image_view in &self.swapchain_image_views {
@@ -237,6 +258,7 @@ struct ResizeResult {
     swapchain: vk::SwapchainKHR,
     swapchain_images: Vec<vk::Image>,
     swapchain_image_views: Vec<vk::ImageView>,
+    depth_buffer_mem_image: vulkan_utils::MemImage,
 }
 
 fn resize_internal(
@@ -250,6 +272,9 @@ fn resize_internal(
     surface_format: &vk::SurfaceFormatKHR,
     present_mode: vk::PresentModeKHR,
     old_swapchain_image_views: &Vec<vk::ImageView>,
+    depth_format: vk::Format,
+    allocator: &mut gpu_allocator::vulkan::Allocator,
+    old_depth_buffer_mem_image: &vulkan_utils::MemImage,
 ) -> Result<ResizeResult, String> {
     log::info!("resizing VulkanBase");
 
@@ -308,6 +333,29 @@ fn resize_internal(
         sgs
     };
 
+    if old_depth_buffer_mem_image.image != vk::Image::null() {
+        log::info!("destroying old depth buffer");
+        unsafe {
+            device.destroy_image(old_depth_buffer_mem_image.image, None);
+            device.destroy_image_view(old_depth_buffer_mem_image.view, None);
+        }
+        let _ = allocator.free(old_depth_buffer_mem_image.allocation.clone());
+    }
+
+    let depth_buffer_sg = {
+        let depth_buffer_mem_image =
+            create_depth_buffer(device, &surface_extent, depth_format, allocator)?;
+
+        guard(depth_buffer_mem_image, |mem_image| {
+            log::warn!("depth buffer mem image scopeguard");
+            unsafe {
+                device.destroy_image(mem_image.image, None);
+                device.destroy_image_view(mem_image.view, None);
+            }
+            let _ = allocator.free(mem_image.allocation);
+        })
+    };
+
     Ok(ResizeResult {
         surface_capabilities,
         surface_extent,
@@ -317,5 +365,6 @@ fn resize_internal(
             .into_iter()
             .map(|sg| ScopeGuard::into_inner(sg))
             .collect(),
+        depth_buffer_mem_image: ScopeGuard::into_inner(depth_buffer_sg),
     })
 }
