@@ -20,18 +20,20 @@ pub fn create_buffer(
         .usage(buffer_usage)
         .sharing_mode(vk::SharingMode::EXCLUSIVE);
 
-    let buffer = unsafe {
-        device
-            .create_buffer(&buffer_create_info, None)
-            .map_err(|_| format!("{}: failed to create", object_name))?
-    };
+    let buffer_sg = {
+        let buffer = unsafe {
+            device
+                .create_buffer(&buffer_create_info, None)
+                .map_err(|_| format!("{}: failed to create", object_name))?
+        };
 
-    let buffer_sg = scopeguard::guard(buffer, |buffer| {
-        log::warn!("{} scopeguard", object_name);
-        unsafe {
-            device.destroy_buffer(buffer, None);
-        }
-    });
+        scopeguard::guard(buffer, |buffer| {
+            log::warn!("{} scopeguard", object_name);
+            unsafe {
+                device.destroy_buffer(buffer, None);
+            }
+        })
+    };
 
     log::info!("{}: created", object_name);
 
@@ -47,14 +49,16 @@ pub fn create_buffer(
         linear: true,
     };
 
-    let allocation = allocator
-        .allocate(&allocation_create_desc)
-        .map_err(|_| format!("{}: failed to allocate memory", object_name))?;
+    let allocation_sg = {
+        let allocation = allocator
+            .allocate(&allocation_create_desc)
+            .map_err(|_| format!("{}: failed to allocate memory", object_name))?;
 
-    let allocation_sg = scopeguard::guard(allocation, |allocation| {
-        log::warn!("{} allocation scopeguard", object_name);
-        let _ = allocator.free(allocation);
-    });
+        scopeguard::guard(allocation, |allocation| {
+            log::warn!("{} allocation scopeguard", object_name);
+            let _ = allocator.free(allocation);
+        })
+    };
 
     log::info!("{}: memory allocated", object_name);
 
@@ -85,7 +89,6 @@ pub fn create_buffer(
 
     Ok(MemBuffer {
         buffer: scopeguard::ScopeGuard::into_inner(buffer_sg),
-        size,
         allocation: scopeguard::ScopeGuard::into_inner(allocation_sg),
     })
 }
@@ -107,65 +110,63 @@ pub fn create_gpu_buffer_init(
     // staging buffer
     log::info!("{}: creating with data", object_name);
 
-    let staging_mem_buffer = create_buffer(
-        device,
-        *allocator_rc.borrow_mut(),
-        debug_utils_loader,
-        init_data.len() as vk::DeviceSize,
-        vk::BufferUsageFlags::TRANSFER_SRC,
-        gpu_allocator::MemoryLocation::CpuToGpu,
-        &format!("{} staging", object_name),
-    )?;
+    let mut staging_mem_buffer_sg = {
+        let staging_mem_buffer = create_buffer(
+            device,
+            *allocator_rc.borrow_mut(),
+            debug_utils_loader,
+            init_data.len() as vk::DeviceSize,
+            vk::BufferUsageFlags::TRANSFER_SRC,
+            gpu_allocator::MemoryLocation::CpuToGpu,
+            &format!("{} staging", object_name),
+        )?;
 
-    let staging_buffer_sg = scopeguard::guard(staging_mem_buffer.buffer, |buffer| {
-        log::warn!("{} staging scopeguard", object_name);
-        unsafe {
-            device.destroy_buffer(buffer, None);
-        }
-    });
-
-    let mut staging_allocation_sg =
-        scopeguard::guard(staging_mem_buffer.allocation, |allocation| {
-            log::warn!("{} staging allocation scopeguard", object_name);
-            let _ = allocator_rc.borrow_mut().free(allocation);
-        });
+        scopeguard::guard(staging_mem_buffer, |mem_buffer| {
+            log::warn!("{} staging scopeguard", object_name);
+            unsafe {
+                device.destroy_buffer(mem_buffer.buffer, None);
+            }
+            let _ = allocator_rc.borrow_mut().free(mem_buffer.allocation);
+        })
+    };
 
     // copy data to staging memory
     log::info!("{} staging: copying data to mapped memory", object_name);
 
-    staging_allocation_sg.mapped_slice_mut().unwrap()[..init_data.len()].copy_from_slice(init_data);
+    staging_mem_buffer_sg.allocation.mapped_slice_mut().unwrap()[..init_data.len()]
+        .copy_from_slice(init_data);
 
     // gpu buffer
-    let gpu_mem_buffer = create_buffer(
-        device,
-        *allocator_rc.borrow_mut(),
-        debug_utils_loader,
-        init_data.len() as vk::DeviceSize,
-        buffer_usage | vk::BufferUsageFlags::TRANSFER_DST,
-        gpu_allocator::MemoryLocation::GpuOnly,
-        object_name,
-    )?;
+    let gpu_mem_buffer_sg = {
+        let gpu_mem_buffer = create_buffer(
+            device,
+            *allocator_rc.borrow_mut(),
+            debug_utils_loader,
+            init_data.len() as vk::DeviceSize,
+            buffer_usage | vk::BufferUsageFlags::TRANSFER_DST,
+            gpu_allocator::MemoryLocation::GpuOnly,
+            object_name,
+        )?;
 
-    let gpu_buffer_sg = scopeguard::guard(gpu_mem_buffer.buffer, |buffer| {
-        log::warn!("{} scopeguard", object_name);
-        unsafe {
-            device.destroy_buffer(buffer, None);
-        }
-    });
-
-    let gpu_allocation_sg = scopeguard::guard(gpu_mem_buffer.allocation, |allocation| {
-        log::warn!("{} allocation scopeguard", object_name);
-        let _ = allocator_rc.borrow_mut().free(allocation);
-    });
+        scopeguard::guard(gpu_mem_buffer, |mem_buffer| {
+            log::warn!("{} scopeguard", object_name);
+            unsafe {
+                device.destroy_buffer(mem_buffer.buffer, None);
+            }
+            let _ = allocator_rc.borrow_mut().free(mem_buffer.allocation);
+        })
+    };
 
     // command pool
-    let command_pool = create_command_pool(device, queue_family, object_name)?;
-    let command_pool_sg = scopeguard::guard(command_pool, |command_pool| {
-        log::warn!("{} command pool scopeguard", object_name);
-        unsafe {
-            device.destroy_command_pool(command_pool, None);
-        }
-    });
+    let command_pool_sg = {
+        let command_pool = create_command_pool(device, queue_family, object_name)?;
+        scopeguard::guard(command_pool, |command_pool| {
+            log::warn!("{} command pool scopeguard", object_name);
+            unsafe {
+                device.destroy_command_pool(command_pool, None);
+            }
+        })
+    };
 
     // command buffer
     let command_buffer = allocate_command_buffer(device, *command_pool_sg, object_name)?;
@@ -176,8 +177,8 @@ pub fn create_gpu_buffer_init(
         device,
         queue,
         command_buffer,
-        *staging_buffer_sg,
-        *gpu_buffer_sg,
+        staging_mem_buffer_sg.buffer,
+        gpu_mem_buffer_sg.buffer,
         buffer_access_mask,
         buffer_stage_flags,
         init_data.len() as vk::DeviceSize,
@@ -187,19 +188,19 @@ pub fn create_gpu_buffer_init(
     // clear temporary objects
     log::info!("{}: destroying temporary objects", object_name);
 
+    let staging_mem_buffer = scopeguard::ScopeGuard::into_inner(staging_mem_buffer_sg);
+
     unsafe {
-        device.destroy_buffer(scopeguard::ScopeGuard::into_inner(staging_buffer_sg), None);
+        device.destroy_buffer(staging_mem_buffer.buffer, None);
         let _ = allocator_rc
             .borrow_mut()
-            .free(scopeguard::ScopeGuard::into_inner(staging_allocation_sg));
+            .free(staging_mem_buffer.allocation);
         device.destroy_command_pool(scopeguard::ScopeGuard::into_inner(command_pool_sg), None);
     }
 
-    Ok(MemBuffer {
-        buffer: scopeguard::ScopeGuard::into_inner(gpu_buffer_sg),
-        size: gpu_allocation_sg.size(),
-        allocation: scopeguard::ScopeGuard::into_inner(gpu_allocation_sg),
-    })
+    let gpu_mem_buffer = scopeguard::ScopeGuard::into_inner(gpu_mem_buffer_sg);
+
+    Ok(gpu_mem_buffer)
 }
 
 fn create_command_pool(
