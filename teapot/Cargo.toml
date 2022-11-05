@@ -1,20 +1,21 @@
 [package]
 authors = ["nc <mynameisnikitablack@gmail.com>"]
-edition = "2018"
+edition = "2021"
 name = "teapot"
 version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ash = "0.33.3"
-ash-window = "0.7.0"
+ash = "0.37.0"
+ash-window = "0.12.0"
 log = "0.4"
+raw-window-handle = "0.5.0"
 scopeguard = "1.1.0"
-simplelog = "0.10.0"
+simplelog = "0.12.0"
 vulkan_base = { path = "../vulkan_base" }
 vulkan_utils = { path = "../vulkan_utils" }
-winit = "0.25.0"
+winit = "0.27.5"
 
 [build-dependencies]
-shaderc = "0.7.1"
+shaderc = "0.8.0"
