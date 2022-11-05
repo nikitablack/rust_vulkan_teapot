@@ -1,9 +1,9 @@
-pub fn create_entry() -> Result<ash::Entry, String> {
+pub fn create_entry() -> ash::Entry {
     log::info!("creating entry");
 
-    let entry = unsafe { ash::Entry::new().map_err(|_| String::from("failed to create Entry"))? };
+    let entry = ash::Entry::linked();
 
     log::info!("entry created");
 
-    Ok(entry)
+    entry
 }

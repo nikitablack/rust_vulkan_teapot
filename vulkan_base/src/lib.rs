@@ -59,7 +59,7 @@ impl VulkanBase {
         required_instance_extensions: &Vec<&'a std::ffi::CStr>,
         required_device_extensions: &Vec<&'b std::ffi::CStr>,
     ) -> Result<Self, String> {
-        let entry = create_entry()?;
+        let entry = create_entry();
         check_instance_version(&entry)?;
         check_required_instance_extensions(&entry, required_instance_extensions)?;
 
