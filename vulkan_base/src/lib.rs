@@ -80,7 +80,7 @@ impl VulkanBase {
         required_instance_extensions: &Vec<&'a std::ffi::CStr>,
         required_device_extensions: &Vec<&'b std::ffi::CStr>,
     ) -> Result<Self, String> {
-        let entry = create_entry()?;
+        let entry = create_entry();
         check_instance_version(&entry)?;
         check_required_instance_extensions(&entry, required_instance_extensions)?;
 
@@ -150,12 +150,7 @@ impl VulkanBase {
             &vec![],
             depth_format,
             &mut allocator,
-            &vulkan_utils::MemImage {
-                image: vk::Image::null(),
-                view: vk::ImageView::null(),
-                extent: vk::Extent3D::default(),
-                allocation: gpu_allocator::vulkan::Allocation::default(),
-            },
+            None,
         )?;
 
         let swapchain_sg = {
@@ -204,6 +199,8 @@ impl VulkanBase {
     }
 
     pub fn resize(&mut self, window: &winit::window::Window) -> Result<(), String> {
+        let old_depth_buffer_mem_image = std::mem::take(&mut self.depth_buffer_mem_image);
+
         let resize_data = resize_internal(
             window,
             &self.device,
@@ -217,7 +214,7 @@ impl VulkanBase {
             &self.swapchain_image_views,
             self.depth_format,
             &mut self.allocator,
-            &self.depth_buffer_mem_image,
+            Some(old_depth_buffer_mem_image),
         )?;
 
         self.surface_capabilities = resize_data.surface_capabilities;
@@ -274,7 +271,7 @@ fn resize_internal(
     old_swapchain_image_views: &Vec<vk::ImageView>,
     depth_format: vk::Format,
     allocator: &mut gpu_allocator::vulkan::Allocator,
-    old_depth_buffer_mem_image: &vulkan_utils::MemImage,
+    old_depth_buffer_mem_image: Option<vulkan_utils::MemImage>,
 ) -> Result<ResizeResult, String> {
     log::info!("resizing VulkanBase");
 
@@ -333,13 +330,13 @@ fn resize_internal(
         sgs
     };
 
-    if old_depth_buffer_mem_image.image != vk::Image::null() {
+    if let Some(mem_image) = old_depth_buffer_mem_image {
         log::info!("destroying old depth buffer");
         unsafe {
-            device.destroy_image(old_depth_buffer_mem_image.image, None);
-            device.destroy_image_view(old_depth_buffer_mem_image.view, None);
+            device.destroy_image(mem_image.image, None);
+            device.destroy_image_view(mem_image.view, None);
         }
-        let _ = allocator.free(old_depth_buffer_mem_image.allocation.clone());
+        let _ = allocator.free(mem_image.allocation);
     }
 
     let depth_buffer_sg = {

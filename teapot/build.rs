@@ -44,7 +44,7 @@ fn compile_shader(path_buf: &std::path::PathBuf, shader_kind: shaderc::ShaderKin
     let shader_str = fs::read_to_string(path_buf)
         .expect(&format!("failed to read shader {:?} to string", path_buf));
 
-    let mut compiler = shaderc::Compiler::new().expect("failed to create shader compilier");
+    let compiler = shaderc::Compiler::new().expect("failed to create shader compilier");
 
     println!("compiling shader {:?}", path_buf);
 

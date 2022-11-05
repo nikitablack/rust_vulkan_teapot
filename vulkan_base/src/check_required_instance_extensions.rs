@@ -9,7 +9,7 @@ pub fn check_required_instance_extensions<'a>(
         required_instance_extensions
     );
 
-    let supported_instance_extensions = match entry.enumerate_instance_extension_properties() {
+    let supported_instance_extensions = match entry.enumerate_instance_extension_properties(None) {
         Ok(props) => props,
         Err(_) => {
             return Err(String::from(
